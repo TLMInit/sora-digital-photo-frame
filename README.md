@@ -11,6 +11,8 @@
 # SORA Frame
 Turn any device with a web browser into a smart, open-source digital photo frame. Manage your photos remotely and enjoy a beautiful, full-screen slideshow on any tablet, laptop, or smart TV.
 
+<img width="1885" alt="slideshow-preview" src="https://github.com/user-attachments/assets/4740a698-08f5-4b7c-bb2e-603ca0ebf012" />
+
 ## Features
 
 - **Run Anywhere**: Works on any device with a modern web browser.
