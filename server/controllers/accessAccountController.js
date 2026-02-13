@@ -128,7 +128,7 @@ class AccessAccountController {
 
     async createAccount(req, res) {
         try {
-            const { name, pin, assignedFolders = [] } = req.body;
+            const { name, pin, assignedFolders = [], uploadAccess = false } = req.body;
 
             if (!name || !pin) {
                 return res.status(400).json({
@@ -154,6 +154,7 @@ class AccessAccountController {
                 name,
                 pin,
                 assignedFolders,
+                uploadAccess: !!uploadAccess,
                 createdAt: new Date().toISOString(),
                 lastAccessed: null
             };
@@ -177,7 +178,7 @@ class AccessAccountController {
     async updateAccount(req, res) {
         try {
             const { id } = req.params;
-            const { name, pin, assignedFolders = [] } = req.body;
+            const { name, pin, assignedFolders = [], uploadAccess } = req.body;
 
             if (!name || !pin) {
                 return res.status(400).json({
@@ -211,7 +212,8 @@ class AccessAccountController {
                 ...accounts[accountIndex],
                 name,
                 pin,
-                assignedFolders
+                assignedFolders,
+                uploadAccess: uploadAccess !== undefined ? !!uploadAccess : !!accounts[accountIndex].uploadAccess
             };
 
             await this.saveAccounts(accounts);
@@ -313,7 +315,8 @@ class AccessAccountController {
             req.session.accessAccount = {
                 id: account.id,
                 name: account.name,
-                assignedFolders: account.assignedFolders
+                assignedFolders: account.assignedFolders,
+                uploadAccess: !!account.uploadAccess
             };
 
             res.json({
@@ -321,7 +324,8 @@ class AccessAccountController {
                 account: {
                     id: account.id,
                     name: account.name,
-                    assignedFolders: account.assignedFolders
+                    assignedFolders: account.assignedFolders,
+                    uploadAccess: !!account.uploadAccess
                 },
                 sessionId: req.sessionID
             });

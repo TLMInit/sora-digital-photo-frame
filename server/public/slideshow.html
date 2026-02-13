@@ -308,6 +308,11 @@
                 <span class="material-icons">info</span>
             </button>
 
+            <a href="/guest-upload" class="btn-icon bg-white/20 hover:bg-white/30 backdrop-blur text-white hidden" id="uploadPageBtn"
+                data-tooltip="Upload Photos" data-side="bottom" style="text-decoration:none;">
+                <span class="material-icons">upload</span>
+            </a>
+
             <button class="btn-icon bg-white/20 hover:bg-white/30 backdrop-blur text-white" id="logoutBtn"
                 data-tooltip="Logout" data-side="bottom">
                 <span class="material-icons">logout</span>
@@ -447,6 +452,12 @@
 
                 this.hideAuthOverlay();
 
+                // Show upload button if user has upload access
+                const uploadBtn = document.getElementById('uploadPageBtn');
+                if (uploadBtn && account.uploadAccess) {
+                    uploadBtn.classList.remove('hidden');
+                }
+
                 document.dispatchEvent(new CustomEvent('authenticationComplete', {
                     detail: { account }
                 }));
@@ -475,6 +486,13 @@
                     this.userAccount = null;
                     sessionStorage.removeItem('authenticated');
                     sessionStorage.removeItem('accountName');
+
+                    // Hide upload button on logout
+                    const uploadBtn = document.getElementById('uploadPageBtn');
+                    if (uploadBtn) {
+                        uploadBtn.classList.add('hidden');
+                    }
+
                     this.showAuthOverlay();
                     this.clearForm();
 

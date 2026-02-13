@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Photos - Digital Photo Frame</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/basecoat.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/toast.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+    <!-- Theme Switcher Script -->
+    <script>
+        (() => {
+            const applyTheme = (mode) => {
+                if (mode === 'system') {
+                    if (matchMedia('(prefers-color-scheme: dark)').matches) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                } else if (mode === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            };
+
+            try {
+                const stored = localStorage.getItem('themeMode') || 'system';
+                applyTheme(stored);
+            } catch (_) { }
+
+            const mediaQuery = matchMedia('(prefers-color-scheme: dark)');
+            mediaQuery.addEventListener('change', () => {
+                const stored = localStorage.getItem('themeMode') || 'system';
+                if (stored === 'system') {
+                    applyTheme('system');
+                }
+            });
+
+            document.addEventListener('basecoat:theme', (e) => {
+                const mode = e.detail?.mode || 'system';
+                applyTheme(mode);
+                localStorage.setItem('themeMode', mode);
+            });
+        })();
+    </script>
+
+    <style>
+        body {
+            background: var(--background);
+            color: var(--foreground);
+            overscroll-behavior: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+        }
+
+        /* Grid styling matching admin panel */
+        .guest-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 140px);
+            gap: 1rem;
+            justify-content: start;
+        }
+
+        .guest-grid > div {
+            width: 140px;
+            height: 140px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .guest-grid > div:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .guest-grid > div.folder {
+            padding: 0.75rem;
+        }
+
+        .guest-grid > div.folder img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            margin-bottom: 0.5rem;
+            filter: brightness(0) saturate(100%) invert(14%) sepia(8%) saturate(928%) hue-rotate(201deg) brightness(93%) contrast(96%);
+        }
+
+        .dark .guest-grid > div.folder img {
+            filter: brightness(0) saturate(100%) invert(98%) sepia(2%) saturate(1077%) hue-rotate(218deg) brightness(109%) contrast(94%);
+        }
+
+        .guest-grid > div.folder span {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--foreground);
+            word-wrap: break-word;
+            line-height: 1.3;
+            max-width: 100%;
+        }
+
+        .guest-grid > div.image {
+            padding: 0;
+        }
+
+        .guest-grid > div.image .photo-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--muted);
+        }
+
+        .guest-grid > div.image .photo-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .guest-grid > div.image .photo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.5) 100%);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0.5rem;
+            z-index: 5;
+        }
+
+        .guest-grid > div.image:hover .photo-overlay,
+        .guest-grid > div.image.selected .photo-overlay {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .photo-actions .btn-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-lg);
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .photo-actions .btn-icon:hover {
+            transform: scale(1.1);
+            background: rgba(255,255,255,0.3);
+        }
+
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            padding: 2rem;
+        }
+
+        .upload-drop-zone.dragover {
+            background-color: var(--muted);
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        .hidden { display: none !important; }
+
+        /* Photo Modal */
+        .photo-modal-dialog {
+            padding: 0;
+            border: none;
+            background: rgba(0, 0, 0, 0.97);
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            margin: 0;
+        }
+
+        .photo-modal-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .photo-modal-content {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        .photo-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 10;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-photo {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+
+        /* Selection FAB */
+        .selection-fab {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 150;
+        }
+
+        .fab-button {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--destructive);
+            color: var(--destructive-foreground);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .fab-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border-radius: 50%;
+            min-width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 700;
+            border: 3px solid var(--background);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header class="flex items-center justify-between p-4 border-b bg-card">
+            <div class="flex items-center gap-4">
+                <button id="backBtn" class="btn-icon" title="Back" style="display:none;">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <h1 class="text-xl font-semibold">
+                    <span class="material-symbols-outlined align-middle mr-1">upload</span>
+                    Upload Photos
+                </h1>
+                <span id="userName" class="text-sm text-muted-foreground"></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="uploadBtn" class="btn" title="Upload Images">
+                    <span class="material-symbols-outlined">upload</span>
+                    Upload
+                </button>
+                <button id="themeToggle" class="btn-icon" title="Switch theme">
+                    <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
+                </button>
+                <button id="logoutBtn" class="btn-icon" title="Sign Out">
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+            </div>
+        </header>
+
+        <nav aria-label="Breadcrumb" class="p-4 border-b">
+            <ol id="breadcrumbContainer" class="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
+                <li>
+                    <span class="breadcrumb-item text-foreground font-medium cursor-pointer" data-path="uploads">Home</span>
+                </li>
+            </ol>
+        </nav>
+
+        <main class="main-content">
+            <div id="fileGrid" class="guest-grid">
+                <!-- Content will be populated here -->
+            </div>
+
+            <div id="emptyState" class="empty-state hidden">
+                <div class="card w-full max-w-md">
+                    <section class="grid gap-4 text-center p-6">
+                        <span class="material-symbols-outlined text-5xl text-muted-foreground">photo_library</span>
+                        <h3 class="text-lg font-medium">No photos uploaded yet</h3>
+                        <p class="text-muted-foreground">Upload your photos to share them on the photo frame</p>
+                        <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-6 cursor-pointer hover:bg-muted/50 transition-colors"
+                            id="emptyStateUploadZone">
+                            <input type="file" id="emptyStateFileInput" multiple accept="image/*" hidden>
+                            <span class="material-symbols-outlined text-3xl text-muted-foreground">cloud_upload</span>
+                            <p class="text-sm font-medium mt-2">Click or drag & drop images here</p>
+                            <p class="text-xs text-muted-foreground">JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                        </div>
+                        <div id="emptyStateSelectedFiles" class="hidden text-left">
+                            <div id="emptyStateFilesList" class="grid gap-1 text-sm text-muted-foreground"></div>
+                        </div>
+                        <div id="emptyStateUploadProgress" class="hidden">
+                            <div class="w-full bg-muted rounded-full h-2">
+                                <div class="empty-state-progress-fill bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <span class="text-sm text-muted-foreground mt-2">Uploading...</span>
+                        </div>
+                        <div class="flex gap-2 justify-center">
+                            <button id="emptyStateCancelBtn" class="btn-outline hidden">Cancel</button>
+                            <button id="emptyStateUploadBtn" class="btn" disabled>
+                                <span class="material-symbols-outlined">upload</span>
+                                <span id="emptyStateUploadBtnText">Select Files</span>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+
+        <!-- Upload Modal -->
+        <dialog id="uploadModal" class="dialog" aria-labelledby="upload-title">
+            <article>
+                <header>
+                    <h2 id="upload-title">Upload Images</h2>
+                    <button id="closeUploadModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <div class="grid gap-4">
+                        <input type="file" id="fileInput" multiple accept="image/*" hidden>
+                        <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                            id="uploadDropZone">
+                            <span class="material-symbols-outlined text-4xl text-muted-foreground">cloud_upload</span>
+                            <p class="text-lg font-medium mt-2">Click to select images or drag and drop</p>
+                            <p class="text-sm text-muted-foreground">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                        </div>
+                        <div id="selectedFilesInfo" class="hidden">
+                            <div class="card">
+                                <header>
+                                    <h3>Selected Files</h3>
+                                </header>
+                                <section>
+                                    <div id="filesList" class="grid gap-2 text-sm text-muted-foreground"></div>
+                                </section>
+                            </div>
+                        </div>
+                        <div id="uploadProgress" class="hidden">
+                            <div class="w-full bg-muted rounded-full h-2">
+                                <div class="progress-fill bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <span class="text-sm text-muted-foreground mt-2">Uploading...</span>
+                        </div>
+                    </div>
+                </section>
+                <footer>
+                    <button id="cancelUploadBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmUploadBtn" class="btn" disabled>
+                        <span class="material-symbols-outlined">upload</span>
+                        <span id="uploadBtnText">Select Files</span>
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Delete Confirmation Modal -->
+        <dialog id="deleteModal" class="dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+            <article>
+                <header>
+                    <h2 id="delete-title">Delete Photo</h2>
+                </header>
+                <section>
+                    <p id="delete-description">Are you sure you want to delete this photo?</p>
+                    <p class="text-sm text-destructive mt-2">This action cannot be undone.</p>
+                </section>
+                <footer>
+                    <button id="cancelDeleteBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmDeleteBtn" class="btn-destructive">
+                        <span class="material-symbols-outlined">delete</span>
+                        Delete
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Bulk Delete Confirmation Modal -->
+        <dialog id="bulkDeleteModal" class="dialog" aria-labelledby="bulk-delete-title">
+            <article>
+                <header>
+                    <h2 id="bulk-delete-title">Delete Photos</h2>
+                    <p>Are you sure you want to delete <span id="deleteCount">0</span> selected photos? This action cannot be undone.</p>
+                </header>
+                <footer>
+                    <button id="cancelBulkDeleteBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmBulkDeleteBtn" class="btn-destructive">
+                        <span class="material-symbols-outlined">delete</span>
+                        Delete Photos
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Photo Modal -->
+        <dialog id="photoModal" class="photo-modal-dialog">
+            <div class="photo-modal-content">
+                <button id="closePhotoModal" class="photo-modal-close" aria-label="Close Photo">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+                <img id="modalImage" src="" alt="" class="modal-photo">
+            </div>
+        </dialog>
+
+        <!-- Floating selection delete FAB -->
+        <div id="selectionFab" class="selection-fab hidden">
+            <button class="fab-button" id="fabDeleteBtn" title="Delete selected photos">
+                <span class="material-symbols-outlined">delete</span>
+                <span class="fab-badge" id="fabBadge">0</span>
+            </button>
+        </div>
+
+        <!-- Basecoat Toast Container -->
+        <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end"></div>
+    </div>
+
+    <script src="guest-upload.js"></script>
+</body>
+
+</html>

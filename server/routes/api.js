@@ -4,8 +4,9 @@ const imageController = require('../controllers/imageController');
 const folderController = require('../controllers/folderController');
 const accessAccountController = require('../controllers/accessAccountController');
 const googlePhotosController = require('../controllers/googlePhotosController');
+const guestUploadController = require('../controllers/guestUploadController');
 const upload = require('../middleware/upload');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireUploadAuth } = require('../middleware/auth');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -50,6 +51,12 @@ router.get('/features', requireAuth, (req, res) => {
 router.post('/auth/pin', accessAccountController.authenticateWithPin.bind(accessAccountController));
 router.get('/auth/session', accessAccountController.getSession.bind(accessAccountController));
 router.delete('/auth/session', accessAccountController.clearSession.bind(accessAccountController));
+
+// Guest upload routes (requires PIN auth with upload access)
+router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));
+router.post('/guest/upload', requireUploadAuth, upload.array('images'), guestUploadController.uploadImages.bind(guestUploadController));
+router.delete('/guest/images', requireUploadAuth, guestUploadController.deleteImage.bind(guestUploadController));
+router.delete('/guest/images/batch', requireUploadAuth, guestUploadController.batchDeleteImages.bind(guestUploadController));
 
 // Google Photos routes (admin only) - conditionally enabled
 if (process.env.ENABLE_GOOGLE_PHOTOS === 'true') {

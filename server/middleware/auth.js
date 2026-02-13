@@ -132,9 +132,35 @@ const getAuthStatus = (req, res) => {
   });
 };
 
+// Check if user has upload access (admin or PIN user with uploadAccess)
+const requireUploadAuth = (req, res, next) => {
+  // Admin is always allowed
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+
+  // PIN-authenticated user with upload access
+  if (req.session && req.session.accessAccount && req.session.accessAccount.uploadAccess) {
+    return next();
+  }
+
+  const isApiRequest = req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
+  
+  if (isApiRequest) {
+    return res.status(401).json({
+      message: 'Upload access required',
+      code: 'UPLOAD_ACCESS_REQUIRED',
+      redirect: '/login'
+    });
+  }
+
+  return res.redirect('/login');
+};
+
 module.exports = {
   requireAuth,
   requireGuest,
+  requireUploadAuth,
   login,
   logout,
   getAuthStatus
