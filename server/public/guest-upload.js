@@ -32,13 +32,16 @@ class GuestUploadManager {
 
     showPinLogin() {
         document.getElementById('pinLoginOverlay').style.display = 'flex';
-        document.getElementById('appContainer').style.display = 'none';
-        this.setupPinLogin();
+        document.getElementById('appContainer').classList.add('hidden');
+        if (!this.pinLoginInitialized) {
+            this.pinLoginInitialized = true;
+            this.setupPinLogin();
+        }
     }
 
     showApp() {
         document.getElementById('pinLoginOverlay').style.display = 'none';
-        document.getElementById('appContainer').style.display = '';
+        document.getElementById('appContainer').classList.remove('hidden');
     }
 
     setupPinLogin() {
