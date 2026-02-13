@@ -2,10 +2,26 @@ const path = require('path');
 const fs = require('fs');
 
 class ViewController {
+  // Helper method to escape string for safe injection into JavaScript
+  _escapeJsString(str) {
+    return str.replace(/\\/g, '\\\\')
+              .replace(/'/g, "\\'")
+              .replace(/"/g, '\\"')
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t');
+  }
+
   // Helper method to inject BASE_PATH into HTML
   _injectBasePath(html, basePath) {
+    // Normalize basePath: ensure it doesn't have trailing slash
+    const normalizedBasePath = basePath || '';
+    
+    // Escape basePath for safe injection into JavaScript
+    const escapedBasePath = this._escapeJsString(normalizedBasePath);
+    
     // Inject a global variable in the head section
-    const basePathScript = `<script>window.BASE_PATH = '${basePath || ''}';</script>`;
+    const basePathScript = `<script>window.BASE_PATH = '${escapedBasePath}';</script>`;
     
     // Inject after <head> tag
     const injectedHtml = html.replace(
@@ -13,15 +29,20 @@ class ViewController {
       `$1\n    ${basePathScript}`
     );
     
+    // Only update paths if basePath is non-empty to avoid double slashes
+    if (!normalizedBasePath) {
+      return injectedHtml;
+    }
+    
     // Update relative paths for local resources
     return injectedHtml
-      .replace(/src="\/js\//g, `src="${basePath}/js/`)
-      .replace(/src="\/admin\//g, `src="${basePath}/admin/`)
-      .replace(/href="\/js\//g, `href="${basePath}/js/`)
-      .replace(/href="\/admin\//g, `href="${basePath}/admin/`)
+      .replace(/src="\/js\//g, `src="${normalizedBasePath}/js/`)
+      .replace(/src="\/admin\//g, `src="${normalizedBasePath}/admin/`)
+      .replace(/href="\/js\//g, `href="${normalizedBasePath}/js/`)
+      .replace(/href="\/admin\//g, `href="${normalizedBasePath}/admin/`)
       // Handle script tags without leading slash
-      .replace(/src="admin\.js"/g, `src="${basePath}/admin.js"`)
-      .replace(/src="js\//g, `src="${basePath}/js/`);
+      .replace(/src="admin\.js"/g, `src="${normalizedBasePath}/admin.js"`)
+      .replace(/src="js\//g, `src="${normalizedBasePath}/js/`);
   }
 
   // Serve admin panel

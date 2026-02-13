@@ -16,7 +16,24 @@ const routes = require('./routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BASE_PATH = process.env.BASE_PATH || '';
+
+// Validate and normalize BASE_PATH
+let BASE_PATH = process.env.BASE_PATH || '';
+if (BASE_PATH) {
+  // Ensure BASE_PATH starts with / and doesn't end with /
+  BASE_PATH = BASE_PATH.trim();
+  if (!BASE_PATH.startsWith('/')) {
+    BASE_PATH = '/' + BASE_PATH;
+  }
+  if (BASE_PATH.endsWith('/')) {
+    BASE_PATH = BASE_PATH.slice(0, -1);
+  }
+  // Validate BASE_PATH contains only safe characters (alphanumeric, -, _, /)
+  if (!/^[a-zA-Z0-9\-_\/]+$/.test(BASE_PATH)) {
+    console.error('Invalid BASE_PATH: Contains unsafe characters. Only alphanumeric, -, _, and / are allowed.');
+    process.exit(1);
+  }
+}
 
 // Trust proxy if running behind reverse proxy
 app.set('trust proxy', 1);
