@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Upload</title>
+    <link rel="stylesheet" href="path/to/basecoat.css">
+    <script src="path/to/api.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Welcome, [User's Name]!</h1>
+        <button id="logout-button">Logout</button>
+    </header>
+
+    <nav>
+        <ul id="breadcrumbs">
+            <!-- Breadcrumb navigation will be populated here -->
+        </ul>
+    </nav>
+
+    <main>
+        <h2>Upload Your Photos</h2>
+        <div id="upload-area" class="drop-area">
+            <p>Drag and drop files here or click to upload.</p>
+            <input type="file" id="file-input" multiple>
+            <progress id="upload-progress" value="0" max="100"></progress>
+        </div>
+    </main>
+
+    <script>
+        // JavaScript to handle folder navigation, upload functionality,
+        // authentication checks, and welcome message handling will go here.
+    </script>
+</body>
+</html>
