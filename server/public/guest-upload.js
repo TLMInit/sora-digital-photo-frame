@@ -16,17 +16,93 @@ class GuestUploadManager {
             const data = await response.json();
 
             if (!data.authenticated || !data.account || !data.account.uploadAccess) {
-                window.location.href = '/slideshow';
+                this.showPinLogin();
                 return;
             }
 
             this.accountInfo = data.account;
             document.getElementById('userName').textContent = `Welcome, ${data.account.name}`;
+            this.showApp();
             this.init();
         } catch (error) {
             console.error('Session check failed:', error);
-            window.location.href = '/slideshow';
+            this.showPinLogin();
         }
+    }
+
+    showPinLogin() {
+        document.getElementById('pinLoginOverlay').style.display = 'flex';
+        document.getElementById('appContainer').style.display = 'none';
+        this.setupPinLogin();
+    }
+
+    showApp() {
+        document.getElementById('pinLoginOverlay').style.display = 'none';
+        document.getElementById('appContainer').style.display = '';
+    }
+
+    setupPinLogin() {
+        const form = document.getElementById('pinLoginForm');
+        const pinInput = document.getElementById('pinInput');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pin = pinInput.value.trim();
+            if (!pin) return;
+
+            const btn = document.getElementById('pinLoginBtn');
+            const spinner = document.getElementById('pinSpinner');
+            const btnText = form.querySelector('.pin-btn-text');
+            const errorDiv = document.getElementById('pinErrorMessage');
+            const errorText = document.getElementById('pinErrorText');
+
+            btn.disabled = true;
+            btnText.textContent = 'Signing in...';
+            spinner.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/auth/pin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ pin })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    if (!data.account.uploadAccess) {
+                        errorText.textContent = 'Your account does not have upload access.';
+                        errorDiv.style.display = 'grid';
+                    } else {
+                        this.accountInfo = data.account;
+                        document.getElementById('userName').textContent = `Welcome, ${data.account.name}`;
+                        this.showApp();
+                        this.init();
+                    }
+                } else {
+                    let message = data.error || 'Invalid PIN';
+                    if (data.attemptsRemaining !== undefined) {
+                        message += ` (${data.attemptsRemaining} attempts remaining)`;
+                    }
+                    errorText.textContent = message;
+                    errorDiv.style.display = 'grid';
+                }
+            } catch (error) {
+                console.error('PIN login error:', error);
+                errorText.textContent = 'Connection error. Please try again.';
+                errorDiv.style.display = 'grid';
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Sign In';
+                spinner.style.display = 'none';
+            }
+        });
+
+        pinInput.addEventListener('input', () => {
+            document.getElementById('pinErrorMessage').style.display = 'none';
+        });
     }
 
     init() {
