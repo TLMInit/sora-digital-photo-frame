@@ -6,13 +6,25 @@ const uploadMetadataController = require('./uploadMetadataController');
 class GuestUploadController {
     constructor() {
         this.uploadsDir = path.join(__dirname, '..', 'uploads');
+        this.serverRoot = path.join(__dirname, '..');
+    }
+
+    // Validate that a path stays within the server directory
+    isPathSafe(targetPath) {
+        const resolved = path.resolve(path.join(this.serverRoot, targetPath));
+        return resolved.startsWith(path.resolve(this.serverRoot));
     }
 
     // Get folder contents for guest users - shows server folders + only own uploaded files
     async getFolderContents(req, res) {
         try {
             const folderPath = req.query.path || 'uploads';
-            const fullPath = path.join(__dirname, '..', folderPath);
+
+            if (!this.isPathSafe(folderPath)) {
+                return res.status(400).json({ message: 'Invalid path' });
+            }
+
+            const fullPath = path.join(this.serverRoot, folderPath);
             const accountId = req.session.accessAccount.id;
 
             if (!await fs.pathExists(fullPath)) {
@@ -39,8 +51,8 @@ class GuestUploadController {
                     // Only show files uploaded by this user
                     if (userFilePaths.has(filePath)) {
                         const relativePath = path.relative(
-                            path.join(__dirname, '..', 'uploads'),
-                            path.join(__dirname, '..', filePath)
+                            this.uploadsDir,
+                            path.join(this.serverRoot, filePath)
                         );
                         files.push({
                             name: item.name,
@@ -74,8 +86,12 @@ class GuestUploadController {
             const processedFiles = [];
             const uploadedPaths = [];
 
+            if (!this.isPathSafe(targetPath)) {
+                return res.status(400).json({ message: 'Invalid path' });
+            }
+
             for (const file of uploadedFiles) {
-                const targetDir = path.join(__dirname, '..', targetPath);
+                const targetDir = path.join(this.serverRoot, targetPath);
                 const targetFilePath = path.join(targetDir, file.filename);
 
                 await fs.ensureDir(targetDir);
@@ -129,13 +145,17 @@ class GuestUploadController {
             const imagePath = req.query.path;
             const accountId = req.session.accessAccount.id;
 
+            if (!imagePath || !this.isPathSafe(imagePath)) {
+                return res.status(400).json({ message: 'Invalid path' });
+            }
+
             // Check ownership
             const isOwned = await uploadMetadataController.isOwnedByAccount(accountId, imagePath);
             if (!isOwned) {
                 return res.status(403).json({ message: 'You can only delete your own photos' });
             }
 
-            const fullPath = path.join(__dirname, '..', imagePath);
+            const fullPath = path.join(this.serverRoot, imagePath);
             if (!await fs.pathExists(fullPath)) {
                 return res.status(404).json({ message: 'Image not found' });
             }
@@ -164,8 +184,11 @@ class GuestUploadController {
                 return res.status(400).json({ message: 'Invalid paths provided' });
             }
 
-            // Check ownership of all paths
+            // Validate all paths and check ownership
             for (const imagePath of paths) {
+                if (!this.isPathSafe(imagePath)) {
+                    return res.status(400).json({ message: 'Invalid path' });
+                }
                 const isOwned = await uploadMetadataController.isOwnedByAccount(accountId, imagePath);
                 if (!isOwned) {
                     return res.status(403).json({ message: 'You can only delete your own photos' });
@@ -180,7 +203,7 @@ class GuestUploadController {
 
             for (const imagePath of paths) {
                 try {
-                    const fullPath = path.join(__dirname, '..', imagePath);
+                    const fullPath = path.join(this.serverRoot, imagePath);
                     if (await fs.pathExists(fullPath)) {
                         await fs.remove(fullPath);
                         results.deletedCount++;
