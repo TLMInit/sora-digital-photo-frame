@@ -139,11 +139,18 @@ class AccessAccountsManager {
             ? new Date(account.lastAccessed).toLocaleDateString()
             : 'Never';
 
+        const uploadBadge = account.uploadAccess
+            ? '<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary"><span class="material-symbols-outlined text-xs">upload</span>Upload</span>'
+            : '';
+
         return `
             <div class="card account-card" data-account-id="${account.id}">
                 <header class="flex items-start justify-between">
                     <div>
-                        <h3 class="text-lg font-semibold">${account.name}</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg font-semibold">${account.name}</h3>
+                            ${uploadBadge}
+                        </div>
                         <div class="grid gap-1 mt-2 text-sm text-muted-foreground">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-base">key</span>
@@ -205,9 +212,11 @@ class AccessAccountsManager {
             title.textContent = 'Edit Access Account';
             document.getElementById('accountName').value = account.name;
             document.getElementById('accountPin').value = account.pin;
+            document.getElementById('uploadAccess').checked = !!account.uploadAccess;
         } else {
             title.textContent = 'Create Access Account';
             form.reset();
+            document.getElementById('uploadAccess').checked = false;
         }
 
         this.clearErrors();
@@ -279,7 +288,8 @@ class AccessAccountsManager {
         const accountData = {
             name: formData.get('name'),
             pin: formData.get('pin'),
-            assignedFolders: selectedFolders
+            assignedFolders: selectedFolders,
+            uploadAccess: document.getElementById('uploadAccess').checked
         };
 
         try {

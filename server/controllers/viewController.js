@@ -49,6 +49,11 @@ class ViewController {
   redirectToSlideshow(req, res) {
     res.redirect('/slideshow');
   }
+
+  // Serve guest upload page
+  serveGuestUpload(req, res) {
+    res.sendFile(path.join(__dirname, '..', 'public', 'guest-upload.html'));
+  }
 }
 
 module.exports = new ViewController();
