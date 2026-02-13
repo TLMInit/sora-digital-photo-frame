@@ -1,3 +1,16 @@
+// Helper function to get the base path
+function getBasePath() {
+    return window.BASE_PATH || '';
+}
+
+// Helper function to build API URLs with base path
+function buildApiUrl(path) {
+    const basePath = getBasePath();
+    // Ensure path starts with /
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${basePath}${normalizedPath}`;
+}
+
 class PhotoFrameAdmin {
     constructor() {
         this.currentPath = this.getInitialPath();
@@ -55,7 +68,7 @@ class PhotoFrameAdmin {
         }));
         
         setTimeout(() => {
-            window.location.href = '/login?expired=true';
+            window.location.href = buildApiUrl('/login?expired=true');
         }, 2000);
     }
 
@@ -636,7 +649,7 @@ class PhotoFrameAdmin {
         }
         
         try {
-            const response = await this.authenticatedFetch('/api/admin/folders', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/admin/folders'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -730,7 +743,7 @@ class PhotoFrameAdmin {
         this.showUploadProgress();
         
         try {
-            const response = await this.authenticatedFetch('/api/upload', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/upload'), {
                 method: 'POST',
                 body: formData
             });
@@ -790,7 +803,7 @@ class PhotoFrameAdmin {
         this.showToast(`Uploading ${files.length} file(s) to ${this.currentPath}...`, 'info');
         
         try {
-            const response = await fetch('/api/upload', {
+            const response = await fetch(buildApiUrl('/api/upload'), {
                 method: 'POST',
                 body: formData
             });
@@ -888,7 +901,7 @@ class PhotoFrameAdmin {
         try {
             const endpoint = item.type === 'folder' ? '/api/admin/folders' : '/api/images';
             console.log('Delete endpoint:', endpoint, 'Path:', item.path);
-            const response = await this.authenticatedFetch(`${endpoint}?path=${encodeURIComponent(item.path)}`, {
+            const response = await this.authenticatedFetch(buildApiUrl(`${endpoint}?path=${encodeURIComponent(item.path)}`), {
                 method: 'DELETE'
             });
             if (!response) return; // Session expired
@@ -920,7 +933,7 @@ class PhotoFrameAdmin {
         try {
             const direction = angle > 0 ? 'right' : 'left';
             this.showToast(`Rotating image ${direction}...`, 'info');
-            const response = await this.authenticatedFetch('/api/images/rotate', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/images/rotate'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -969,7 +982,7 @@ class PhotoFrameAdmin {
 
     async checkFeatureFlags() {
         try {
-            const response = await this.authenticatedFetch('/api/features');
+            const response = await this.authenticatedFetch(buildApiUrl('/api/features'));
             
             if (response && response.ok) {
                 const features = await response.json();
@@ -992,7 +1005,7 @@ class PhotoFrameAdmin {
 
     async logout() {
         try {
-            const response = await this.authenticatedFetch('/api/auth/logout', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/auth/logout'), {
                 method: 'POST'
             });
             
@@ -1304,7 +1317,7 @@ class PhotoFrameAdmin {
         try {
             this.showToast('Deleting photos...', 'info');
             
-            const response = await this.authenticatedFetch('/api/images/batch', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/images/batch'), {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1475,7 +1488,7 @@ class PhotoFrameAdmin {
         this.showEmptyStateUploadProgress();
         
         try {
-            const response = await this.authenticatedFetch('/api/upload', {
+            const response = await this.authenticatedFetch(buildApiUrl('/api/upload'), {
                 method: 'POST',
                 body: formData
             });

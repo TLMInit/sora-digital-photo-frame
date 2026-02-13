@@ -16,9 +16,13 @@ const routes = require('./routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const BASE_PATH = process.env.BASE_PATH || '';
 
 // Trust proxy if running behind reverse proxy
 app.set('trust proxy', 1);
+
+// Store BASE_PATH for use in views and routes
+app.locals.basePath = BASE_PATH;
 
 // Middleware
 app.use(cors());
@@ -47,17 +51,23 @@ app.use(session({
 
 app.use(logger);
 
+// Middleware to inject BASE_PATH into requests
+app.use((req, res, next) => {
+  res.locals.basePath = BASE_PATH;
+  next();
+});
+
 // Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/js', express.static(path.join(__dirname, 'public/js')));
-app.use('/admin', express.static(path.join(__dirname, 'public')));
+app.use(`${BASE_PATH}/uploads`, express.static(path.join(__dirname, 'uploads')));
+app.use(`${BASE_PATH}/js`, express.static(path.join(__dirname, 'public/js')));
+app.use(`${BASE_PATH}/admin`, express.static(path.join(__dirname, 'public')));
 // Serve CSS and JS files from root for access-accounts page
-app.use(express.static(path.join(__dirname, 'public'), {
+app.use(BASE_PATH, express.static(path.join(__dirname, 'public'), {
   index: false // Prevent serving index.html from root
 }));
 
 // Routes
-app.use('/', routes);
+app.use(BASE_PATH, routes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
@@ -77,10 +87,12 @@ const initializeUploads = async () => {
 // Start server
 app.listen(PORT, async () => {
   await initializeUploads();
+  const basePath = BASE_PATH || '/';
   console.log(`Digital Photo Frame Server running on port ${PORT}`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin`);
-  console.log(`Slideshow: http://localhost:${PORT}/slideshow`);
-  console.log(`API endpoint: http://localhost:${PORT}/api/random-image`);
+  console.log(`Base path: ${basePath}`);
+  console.log(`Admin panel: http://localhost:${PORT}${BASE_PATH}/admin`);
+  console.log(`Slideshow: http://localhost:${PORT}${BASE_PATH}/slideshow`);
+  console.log(`API endpoint: http://localhost:${PORT}${BASE_PATH}/api/random-image`);
 });
 
 module.exports = app;

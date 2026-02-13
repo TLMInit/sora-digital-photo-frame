@@ -1,5 +1,12 @@
 console.log('🔧 [DEBUG] GooglePhotosSync.js file loaded successfully');
 
+// Helper function to build API URLs with base path
+function buildApiUrl(path) {
+  const basePath = window.BASE_PATH || '';
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${basePath}${normalizedPath}`;
+}
+
 class GooglePhotosSync {
   constructor() {
     console.log('🔧 [DEBUG] GooglePhotosSync constructor called');
@@ -50,7 +57,7 @@ class GooglePhotosSync {
         return;
       }
 
-      const response = await fetch('/api/admin/google-photos/status');
+      const response = await fetch(buildApiUrl('/api/admin/google-photos/status'));
 
       // Check for session expiration
       if (response.status === 401) {
@@ -133,10 +140,10 @@ class GooglePhotosSync {
         console.log('🔧 [DEBUG] Button set to loading state');
       }
 
-      const redirectUri = window.location.origin + '/api/admin/google-photos/callback';
+      const redirectUri = window.location.origin + buildApiUrl('/api/admin/google-photos/callback');
       console.log('🔧 [DEBUG] Making auth request with redirectUri:', redirectUri);
 
-      const response = await fetch('/api/admin/google-photos/auth', {
+      const response = await fetch(buildApiUrl('/api/admin/google-photos/auth'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -251,7 +258,7 @@ class GooglePhotosSync {
 
   async logout() {
     try {
-      const response = await fetch('/api/admin/google-photos/auth', {
+      const response = await fetch(buildApiUrl('/api/admin/google-photos/auth'), {
         method: 'DELETE'
       });
 
@@ -349,7 +356,7 @@ class GooglePhotosSync {
     try {
       console.log('🔧 [DEBUG] Creating Google Photos picker session...');
 
-      const response = await fetch('/api/admin/google-photos/picker-session', {
+      const response = await fetch(buildApiUrl('/api/admin/google-photos/picker-session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -480,7 +487,7 @@ class GooglePhotosSync {
     try {
       console.log('🔧 [DEBUG] Polling session:', this.currentSessionData.id);
 
-      const response = await fetch(`/api/admin/google-photos/session/${this.currentSessionData.id}`);
+      const response = await fetch(buildApiUrl(`/api/admin/google-photos/session/${this.currentSessionData.id}`));
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -507,7 +514,7 @@ class GooglePhotosSync {
       // Show loading state for media items
       this.showMediaItemsLoading();
 
-      const response = await fetch(`/api/admin/google-photos/session/${this.currentSessionData.id}/media-items`);
+      const response = await fetch(buildApiUrl(`/api/admin/google-photos/session/${this.currentSessionData.id}/media-items`));
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -753,7 +760,7 @@ class GooglePhotosSync {
       // Show importing state briefly
       this.showImportingState();
 
-      const response = await fetch('/api/admin/google-photos/import', {
+      const response = await fetch(buildApiUrl('/api/admin/google-photos/import'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -826,7 +833,7 @@ class GooglePhotosSync {
 
     const checkInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/admin/google-photos/job/${jobId}`);
+        const response = await fetch(buildApiUrl(`/api/admin/google-photos/job/${jobId}`));
         const data = await response.json();
 
         if (response.ok && data.success) {

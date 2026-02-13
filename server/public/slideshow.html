@@ -343,6 +343,13 @@
     <script src="/js/folderSelector.js"></script>
 
     <script>
+        // Helper function to build API URLs with base path
+        function buildApiUrl(path) {
+            const basePath = window.BASE_PATH || '';
+            const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+            return `${basePath}${normalizedPath}`;
+        }
+
         class AuthenticationManager {
             constructor() {
                 this.isAuthenticated = false;
@@ -387,7 +394,7 @@
 
             async checkExistingSession() {
                 try {
-                    const response = await fetch('/api/auth/session');
+                    const response = await fetch(buildApiUrl('/api/auth/session'));
                     const data = await response.json();
 
                     if (data.authenticated) {
@@ -417,7 +424,7 @@
                 this.setLoading(true);
 
                 try {
-                    const response = await fetch('/api/auth/pin', {
+                    const response = await fetch(buildApiUrl('/api/auth/pin'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ pin })
@@ -467,7 +474,7 @@
 
             async logout() {
                 try {
-                    await fetch('/api/auth/session', { method: 'DELETE' });
+                    await fetch(buildApiUrl('/api/auth/session'), { method: 'DELETE' });
                 } catch (error) {
                     console.error('Logout error:', error);
                 } finally {

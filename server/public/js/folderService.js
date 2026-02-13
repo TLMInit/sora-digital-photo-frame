@@ -3,7 +3,7 @@
  */
 class FolderService {
     constructor() {
-        this.baseUrl = '/api';
+        this.baseUrl = (window.BASE_PATH || '') + '/api';
     }
 
     /**
