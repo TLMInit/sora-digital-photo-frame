@@ -2,17 +2,23 @@ const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const uploadMetadataController = require('./uploadMetadataController');
+const imageController = require('./imageController');
 
 class GuestUploadController {
     constructor() {
         this.uploadsDir = path.join(__dirname, '..', 'uploads');
         this.serverRoot = path.join(__dirname, '..');
+        this.resolvedServerRoot = path.resolve(this.serverRoot);
     }
 
     // Validate that a path stays within the server directory
     isPathSafe(targetPath) {
-        const resolved = path.resolve(path.join(this.serverRoot, targetPath));
-        return resolved.startsWith(path.resolve(this.serverRoot));
+        if (!targetPath || targetPath.includes('\0')) {
+            return false;
+        }
+        const normalized = path.normalize(targetPath);
+        const resolved = path.resolve(path.join(this.serverRoot, normalized));
+        return resolved.startsWith(this.resolvedServerRoot);
     }
 
     // Get folder contents for guest users - shows server folders + only own uploaded files
@@ -126,7 +132,6 @@ class GuestUploadController {
             await uploadMetadataController.recordUploads(accountId, accountName, uploadedPaths);
 
             // Clear image cache
-            const imageController = require('./imageController');
             imageController.clearImageCache();
 
             res.json({
@@ -164,7 +169,6 @@ class GuestUploadController {
             await uploadMetadataController.removeMetadata(imagePath);
 
             // Clear image cache
-            const imageController = require('./imageController');
             imageController.clearImageCache();
 
             res.json({ message: 'Image deleted successfully' });
@@ -220,7 +224,6 @@ class GuestUploadController {
             await uploadMetadataController.removeMetadataBatch(paths);
 
             // Clear image cache
-            const imageController = require('./imageController');
             imageController.clearImageCache();
 
             if (results.failedCount > 0) {

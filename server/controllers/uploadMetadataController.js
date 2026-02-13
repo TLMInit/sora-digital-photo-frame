@@ -48,12 +48,13 @@ class UploadMetadataController {
 
     async recordUploads(accountId, accountName, filePaths) {
         const metadata = await this.loadMetadata();
+        const uploadedAt = new Date().toISOString();
         for (const filePath of filePaths) {
             metadata.push({
                 accountId,
                 accountName,
                 filePath,
-                uploadedAt: new Date().toISOString()
+                uploadedAt
             });
         }
         await this.saveMetadata(metadata);
