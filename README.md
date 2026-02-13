@@ -47,6 +47,24 @@ On the slideshow screen, you can:
 - `F`: Toggle fullscreen mode
 - `I`: Show/hide image information
 
+## Deployment Options
+
+### Running Under a Custom Path
+
+The application supports running under a custom base path (e.g., `/photo-frame`) for easier deployment behind reverse proxies or when hosting multiple applications on the same domain.
+
+Set the `BASE_PATH` environment variable:
+```bash
+BASE_PATH=/photo-frame npm start
+```
+
+Or in Docker:
+```bash
+docker run -e BASE_PATH=/photo-frame ...
+```
+
+See [DOCKER.md](DOCKER.md) for detailed reverse proxy configuration examples.
+
 ## License
 
 This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.

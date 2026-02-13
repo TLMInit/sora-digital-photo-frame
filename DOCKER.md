@@ -72,10 +72,19 @@ echo "ADMIN_PASSWORD=MySecurePassword123!" >> .env
 docker compose up -d
 ```
 
+**Use Base Path (for reverse proxy or subpath hosting):**
+```bash
+# Run app under /photo-frame path
+echo "BASE_PATH=/photo-frame" >> .env
+docker compose up -d
+# Access at http://localhost:3000/photo-frame
+```
+
 **Multiple Options:**
 ```bash
 # .env file example
 HOST_PORT=8080
+BASE_PATH=/photo-frame
 ADMIN_PASSWORD=SecurePass123!
 SESSION_SECRET=$(openssl rand -base64 32)
 ```
@@ -86,6 +95,7 @@ SESSION_SECRET=$(openssl rand -base64 32)
 |----------|-------------|----------|---------|
 | `HOST_PORT` | External port on host machine | No | 3000 |
 | `CONTAINER_PORT` | Internal container port | No | 3000 |
+| `BASE_PATH` | Base path for the application (e.g., `/photo-frame`) | No | `` (root) |
 | `NODE_ENV` | Node environment | No | production |
 | `SESSION_SECRET` | Session encryption key | **Yes** | - |
 | `ADMIN_PASSWORD` | Admin login password | **Recommended** | admin123 |
@@ -169,6 +179,7 @@ For production deployment:
 2. **Use a reverse proxy:**
    - Consider using nginx or traefik in front of the container
    - Enable HTTPS for secure sessions
+   - Set `BASE_PATH` if hosting under a subpath (see Reverse Proxy Setup below)
 
 3. **Backup volumes:**
    - Regularly backup the `photo-uploads` and `photo-data` volumes
@@ -176,3 +187,66 @@ For production deployment:
 4. **Monitor resources:**
    - The Sharp image processing library can be memory-intensive
    - Monitor container resource usage under load
+
+## Reverse Proxy Setup
+
+When running behind a reverse proxy (nginx, Apache, Traefik, etc.), you can use the `BASE_PATH` environment variable to host the application under a specific path.
+
+### Example: Nginx Configuration
+
+**Application Configuration (.env):**
+```bash
+BASE_PATH=/photo-frame
+```
+
+**Nginx Configuration:**
+```nginx
+location /photo-frame/ {
+    proxy_pass http://localhost:3000/photo-frame/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_cache_bypass $http_upgrade;
+}
+```
+
+### Example: Apache Configuration
+
+**Application Configuration (.env):**
+```bash
+BASE_PATH=/photo-frame
+```
+
+**Apache Configuration:**
+```apache
+<Location /photo-frame>
+    ProxyPass http://localhost:3000/photo-frame
+    ProxyPassReverse http://localhost:3000/photo-frame
+    ProxyPreserveHost On
+</Location>
+```
+
+### Example: Traefik (Docker Labels)
+
+```yaml
+services:
+  photo-frame:
+    build: .
+    environment:
+      - BASE_PATH=/photo-frame
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.photo-frame.rule=PathPrefix(`/photo-frame`)"
+      - "traefik.http.routers.photo-frame.entrypoints=web"
+```
+
+### Important Notes
+
+- The `BASE_PATH` should start with a `/` and should NOT end with a `/`
+- Examples: `/photo-frame`, `/apps/photos`, `/gallery`
+- When using `BASE_PATH`, access the application at: `http://your-domain:port/your-base-path`
+- Without `BASE_PATH`, the application runs at the root path `/`

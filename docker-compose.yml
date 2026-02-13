@@ -7,6 +7,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${CONTAINER_PORT:-3000}
+      - BASE_PATH=${BASE_PATH:-}
       - SESSION_SECRET=${SESSION_SECRET:-your-secret-key-change-this}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
