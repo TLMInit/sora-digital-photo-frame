@@ -50,6 +50,7 @@
     </script>
 
     <style>
+        /* Basecoat-style body CSS with theme support */
         body {
             background: var(--background);
             color: var(--foreground);
@@ -58,6 +59,7 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
+        /* Custom admin-specific styles - minimal usage */
         .app {
             min-height: 100vh;
             display: flex;
@@ -69,15 +71,16 @@
             padding: 1rem;
         }
 
-        /* Grid styling matching admin panel */
-        .guest-grid {
+        /* Admin Grid - Fixed size cells like original design */
+        .admin-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, 140px);
             gap: 1rem;
             justify-content: start;
         }
 
-        .guest-grid > div {
+        /* File items - using basecoat card styling */
+        .admin-grid>div {
             width: 140px;
             height: 140px;
             background: var(--card);
@@ -94,29 +97,37 @@
             text-align: center;
         }
 
-        .guest-grid > div:hover {
+        .admin-grid>div:hover {
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             transform: translateY(-2px);
         }
 
-        .guest-grid > div.folder {
+        /* Folder styling */
+        .admin-grid>div.folder {
             padding: 0.75rem;
         }
 
-        .guest-grid > div.folder img {
+        .admin-grid>div.folder img {
             width: 48px;
             height: 48px;
             object-fit: contain;
             margin-bottom: 0.5rem;
+            transition: transform 0.2s ease, filter 0.2s ease;
+            /* Light theme - folder color matches foreground */
             filter: brightness(0) saturate(100%) invert(14%) sepia(8%) saturate(928%) hue-rotate(201deg) brightness(93%) contrast(96%);
         }
 
-        .dark .guest-grid > div.folder img {
+        /* Dark theme - folder color matches foreground in dark mode */
+        .dark .admin-grid>div.folder img {
             filter: brightness(0) saturate(100%) invert(98%) sepia(2%) saturate(1077%) hue-rotate(218deg) brightness(109%) contrast(94%);
         }
 
-        .guest-grid > div.folder span {
+        .admin-grid>div.folder:hover img {
+            transform: scale(1.1);
+        }
+
+        .admin-grid>div.folder span {
             font-size: 0.875rem;
             font-weight: 500;
             color: var(--foreground);
@@ -125,11 +136,13 @@
             max-width: 100%;
         }
 
-        .guest-grid > div.image {
+        /* Image styling */
+        .admin-grid>div.image {
             padding: 0;
         }
 
-        .guest-grid > div.image .photo-image {
+        /* Image container */
+        .admin-grid>div.image .admin-photo-image {
             position: absolute;
             top: 0;
             left: 0;
@@ -139,54 +152,250 @@
             background: var(--muted);
         }
 
-        .guest-grid > div.image .photo-image img {
+        .admin-grid>div.image .admin-photo-image img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 0.3s ease;
         }
 
-        .guest-grid > div.image .photo-overlay {
+        /* Hover overlay with controls - hidden by default */
+        .admin-grid>div.image .photo-grid-overlay {
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.5) 100%);
+            background: linear-gradient(135deg,
+                    rgba(0, 0, 0, 0.1) 0%,
+                    rgba(0, 0, 0, 0.3) 50%,
+                    rgba(0, 0, 0, 0.5) 100%);
             opacity: 0;
             visibility: hidden;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 0.5rem;
+            padding: 0.75rem;
             z-index: 5;
+            backdrop-filter: blur(2px);
         }
 
-        .guest-grid > div.image:hover .photo-overlay,
-        .guest-grid > div.image.selected .photo-overlay {
+        /* Show overlay on hover or when selected */
+        .admin-grid>div.image:hover .photo-grid-overlay,
+        .admin-grid>div.image.selected .photo-grid-overlay {
             opacity: 1;
             visibility: visible;
         }
 
-        .photo-actions .btn-icon {
-            width: 32px;
-            height: 32px;
+        /* Top row with checkbox */
+        .photo-grid-overlay-top {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+        }
+
+        /* Bottom row with action buttons */
+        .photo-grid-overlay-bottom {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+        }
+
+        /* Action buttons container - horizontal layout */
+        .photo-grid-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        /* Action buttons styling - Enhanced with better visuals */
+        .photo-grid-actions .btn-icon {
+            width: 36px;
+            height: 36px;
             border-radius: var(--radius-lg);
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+            position: relative;
+            overflow: hidden;
         }
 
-        .photo-actions .btn-icon:hover {
+        .photo-grid-actions .btn-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.1);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .photo-grid-actions .btn-icon:hover {
             transform: scale(1.1);
-            background: rgba(255,255,255,0.3);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.4);
         }
 
+        .photo-grid-actions .btn-icon:hover::before {
+            opacity: 1;
+        }
+
+        .photo-grid-actions .btn-icon:active {
+            transform: scale(0.95);
+        }
+
+        .photo-grid-actions .btn-icon:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+        .photo-grid-actions .btn-icon .material-symbols-outlined {
+            font-size: 18px;
+            font-weight: 500;
+            z-index: 1;
+            position: relative;
+        }
+
+        /* Enhanced Delete button styling */
+        .photo-grid-actions .btn-icon[data-action="delete"] {
+            background: rgba(220, 38, 38, 0.2);
+            border-color: rgba(220, 38, 38, 0.3);
+        }
+
+        .photo-grid-actions .btn-icon[data-action="delete"]:hover {
+            background: var(--destructive);
+            color: var(--destructive-foreground);
+            border-color: var(--destructive);
+            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+        }
+
+        /* Enhanced View button styling */
+        .photo-grid-actions .btn-icon[data-action="view"] {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .photo-grid-actions .btn-icon[data-action="view"]:hover {
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border-color: var(--primary);
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Checkbox container styling for photo grid overlay */
+        .photo-grid-checkbox {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: var(--radius-sm);
+            padding: 6px;
+            backdrop-filter: blur(4px);
+            transition: all var(--transition-fast);
+        }
+
+        .photo-grid-checkbox:hover {
+            background: rgba(0, 0, 0, 0.7);
+            transform: scale(1.05);
+        }
+
+        .photo-grid-checkbox .label {
+            margin: 0;
+            cursor: pointer;
+            gap: 0;
+        }
+
+        /* Screen reader only text */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Image info bar at bottom */
+        .admin-grid>div.image .photo-grid-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 0.5rem;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 80%, transparent 100%);
+            color: white;
+            backdrop-filter: blur(2px);
+            z-index: 2;
+        }
+
+        .admin-grid>div.image .photo-grid-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Selected state - Enhanced visual feedback */
+        .admin-grid>div.image.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary), 0 4px 12px rgba(0, 0, 0, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .admin-grid>div.image.selected::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg,
+                    rgba(var(--primary-rgb), 0.15) 0%,
+                    rgba(var(--primary-rgb), 0.05) 50%,
+                    rgba(var(--primary-rgb), 0.15) 100%);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .admin-grid {
+                grid-template-columns: repeat(auto-fill, 110px);
+                gap: 0.5rem;
+            }
+
+            .admin-grid>div {
+                width: 110px;
+                height: 110px;
+            }
+
+            .admin-grid>div.folder img {
+                width: 36px;
+                height: 36px;
+            }
+
+            .admin-grid>div.folder span {
+                font-size: 0.75rem;
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Empty state styling */
         .empty-state {
             display: flex;
             align-items: center;
@@ -195,68 +404,35 @@
             padding: 2rem;
         }
 
-        .upload-drop-zone.dragover {
+        .empty-state .upload-drop-zone:hover {
+            background-color: var(--muted);
+            opacity: 0.8;
+        }
+
+        .empty-state .upload-drop-zone:active {
+            transform: scale(0.98);
+        }
+
+        .empty-state .upload-drop-zone.dragover {
             background-color: var(--muted);
             border-color: var(--primary);
             transform: scale(1.02);
         }
 
-        .hidden { display: none !important; }
-
-        /* Photo Modal */
-        .photo-modal-dialog {
-            padding: 0;
-            border: none;
-            background: rgba(0, 0, 0, 0.97);
-            width: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            max-height: 100vh;
-            margin: 0;
-        }
-
-        .photo-modal-dialog::backdrop {
-            background: rgba(0, 0, 0, 0.9);
-        }
-
-        .photo-modal-content {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
-
-        .photo-modal-close {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            z-index: 10;
-            background: rgba(255,255,255,0.15);
-            border: none;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-photo {
-            max-width: 90vw;
-            max-height: 90vh;
-            object-fit: contain;
-        }
-
-        /* Selection FAB */
+        /* Enhanced FAB Component with Better Badge */
         .selection-fab {
             position: fixed;
             bottom: 1.5rem;
             right: 1.5rem;
             z-index: 150;
+            opacity: 0;
+            transform: translateY(100px) scale(0.8);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .selection-fab:not(.hidden) {
+            opacity: 1;
+            transform: translateY(0) scale(1);
         }
 
         .fab-button {
@@ -270,7 +446,52 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.3),
+                0 8px 32px -8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fab-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg,
+                    rgba(255, 255, 255, 0.2) 0%,
+                    rgba(255, 255, 255, 0.05) 50%,
+                    rgba(0, 0, 0, 0.1) 100%);
+            border-radius: 50%;
+            transition: opacity 0.2s ease;
+        }
+
+        .fab-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.4),
+                0 12px 40px -8px rgba(0, 0, 0, 0.3);
+        }
+
+        .fab-button:hover::before {
+            opacity: 0.8;
+        }
+
+        .fab-button:active {
+            transform: scale(0.95);
+        }
+
+        .fab-button:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+        .fab-button .material-symbols-outlined {
+            font-size: 28px;
+            font-weight: 400;
+            z-index: 1;
+            position: relative;
         }
 
         .fab-badge {
@@ -288,6 +509,184 @@
             font-size: 0.875rem;
             font-weight: 700;
             border: 3px solid var(--background);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: pulse-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fab-badge.updated {
+            animation: bounce-badge 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes pulse-in {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes bounce-badge {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            25% {
+                transform: scale(1.25);
+            }
+
+            50% {
+                transform: scale(0.9);
+            }
+
+            75% {
+                transform: scale(1.1);
+            }
+        }
+
+        /* Enhanced Photo Modal Dialog */
+        .photo-modal-dialog {
+            padding: 0;
+            border: none;
+            background: rgba(0, 0, 0, 0.97);
+            backdrop-filter: blur(8px);
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            margin: 0;
+            animation: modal-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .photo-modal-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.9);
+            animation: backdrop-fade-in 0.3s ease;
+        }
+
+        @keyframes modal-fade-in {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes backdrop-fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .photo-modal-content {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 2rem;
+        }
+
+        /* Enhanced Close Button */
+        .photo-modal-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1001;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .photo-modal-close:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .photo-modal-close:active {
+            transform: scale(0.95);
+        }
+
+        .photo-modal-close:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+        .photo-modal-close .material-symbols-outlined {
+            font-size: 28px;
+            font-weight: 400;
+            z-index: 1;
+            position: relative;
+        }
+
+        /* Enhanced Modal Photo */
+        .modal-photo {
+            max-width: calc(100vw - 4rem);
+            max-height: calc(100vh - 8rem);
+            object-fit: contain;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5),
+                0 4px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        .modal-photo:hover {
+            box-shadow: 0 16px 64px rgba(0, 0, 0, 0.6),
+                0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Mobile responsiveness for photo modal */
+        @media (max-width: 768px) {
+            .photo-modal-content {
+                padding: 1rem;
+            }
+
+            .photo-modal-close {
+                top: 1rem;
+                right: 1rem;
+                width: 40px;
+                height: 40px;
+            }
+
+            .photo-modal-close .material-symbols-outlined {
+                font-size: 20px;
+            }
+
+            .modal-photo {
+                max-width: calc(100vw - 2rem);
+                max-height: calc(100vh - 6rem);
+            }
         }
     </style>
 </head>
@@ -328,40 +727,53 @@
         </nav>
 
         <main class="main-content">
-            <div id="fileGrid" class="guest-grid">
+            <div id="fileGrid" class="admin-grid">
                 <!-- Content will be populated here -->
             </div>
 
             <div id="emptyState" class="empty-state hidden">
-                <div class="card w-full max-w-md">
-                    <section class="grid gap-4 text-center p-6">
-                        <span class="material-symbols-outlined text-5xl text-muted-foreground">photo_library</span>
-                        <h3 class="text-lg font-medium">No photos uploaded yet</h3>
+                <div class="max-w-md mx-auto">
+                    <div class="text-center mb-6">
+                        <span class="material-symbols-outlined text-6xl text-muted-foreground">photo_library</span>
+                        <h3 class="text-xl font-semibold mt-4 mb-2">No photos uploaded yet</h3>
                         <p class="text-muted-foreground">Upload your photos to share them on the photo frame</p>
-                        <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-6 cursor-pointer hover:bg-muted/50 transition-colors"
-                            id="emptyStateUploadZone">
-                            <input type="file" id="emptyStateFileInput" multiple accept="image/*" hidden>
-                            <span class="material-symbols-outlined text-3xl text-muted-foreground">cloud_upload</span>
-                            <p class="text-sm font-medium mt-2">Click or drag & drop images here</p>
-                            <p class="text-xs text-muted-foreground">JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                    </div>
+
+                    <input type="file" id="emptyStateFileInput" multiple accept="image/*" hidden>
+                    <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                        id="emptyStateUploadZone">
+                        <span class="material-symbols-outlined text-4xl text-muted-foreground">cloud_upload</span>
+                        <p class="text-lg font-medium mt-2">Click to select images or drag and drop</p>
+                        <p class="text-sm text-muted-foreground">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                    </div>
+
+                    <div id="emptyStateSelectedFiles" class="hidden mt-4">
+                        <div class="card">
+                            <header>
+                                <h3 class="text-lg font-semibold">Selected Files</h3>
+                            </header>
+                            <section>
+                                <div id="emptyStateFilesList" class="grid gap-2 text-sm text-muted-foreground"></div>
+                            </section>
                         </div>
-                        <div id="emptyStateSelectedFiles" class="hidden text-left">
-                            <div id="emptyStateFilesList" class="grid gap-1 text-sm text-muted-foreground"></div>
+                    </div>
+
+                    <div id="emptyStateUploadProgress" class="hidden mt-4">
+                        <div class="w-full bg-muted rounded-full h-2">
+                            <div class="empty-state-progress-fill bg-primary h-2 rounded-full transition-all duration-300"
+                                style="width: 0%"></div>
                         </div>
-                        <div id="emptyStateUploadProgress" class="hidden">
-                            <div class="w-full bg-muted rounded-full h-2">
-                                <div class="empty-state-progress-fill bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                            </div>
-                            <span class="text-sm text-muted-foreground mt-2">Uploading...</span>
-                        </div>
-                        <div class="flex gap-2 justify-center">
-                            <button id="emptyStateCancelBtn" class="btn-outline hidden">Cancel</button>
-                            <button id="emptyStateUploadBtn" class="btn" disabled>
-                                <span class="material-symbols-outlined">upload</span>
-                                <span id="emptyStateUploadBtnText">Select Files</span>
-                            </button>
-                        </div>
-                    </section>
+                        <span
+                            class="empty-state-progress-text text-sm text-muted-foreground mt-2 block text-center">Uploading...</span>
+                    </div>
+
+                    <div class="flex gap-2 justify-center mt-4">
+                        <button id="emptyStateCancelBtn" class="btn-outline hidden">Cancel</button>
+                        <button id="emptyStateUploadBtn" class="btn" disabled>
+                            <span class="material-symbols-outlined">upload</span>
+                            <span id="emptyStateUploadBtnText">Select Files</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -459,12 +871,13 @@
             </div>
         </dialog>
 
-        <!-- Floating selection delete FAB -->
+        <!-- Floating Action Button -->
         <div id="selectionFab" class="selection-fab hidden">
-            <button class="fab-button" id="fabDeleteBtn" title="Delete selected photos">
+            <button id="fabDeleteBtn" class="fab-button" title="Delete selected photos"
+                aria-label="Delete Selected Photos">
                 <span class="material-symbols-outlined">delete</span>
-                <span class="fab-badge" id="fabBadge">0</span>
             </button>
+            <span class="fab-badge" id="fabBadge">0</span>
         </div>
 
         <!-- Basecoat Toast Container -->

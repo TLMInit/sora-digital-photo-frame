@@ -241,10 +241,12 @@ class GuestUploadManager {
             const div = document.createElement('div');
             div.className = 'file-item folder';
             div.dataset.path = folder.path;
+            div.dataset.type = 'folder';
             div.innerHTML = `
-                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E"
-                     alt="folder" width="48" height="48">
-                <span>${folder.name}</span>
+                <div class="folder-icon">
+                    <img src="icons/ic_folder.svg" alt="Folder" />
+                </div>
+                <div class="folder-name">${folder.name}</div>
             `;
             div.addEventListener('click', () => this.navigateTo(folder.path));
             fileGrid.appendChild(div);
@@ -255,47 +257,39 @@ class GuestUploadManager {
             const div = document.createElement('div');
             div.className = 'file-item image';
             div.dataset.path = file.path;
+            div.dataset.type = 'image';
             div.innerHTML = `
-                <div class="photo-image">
+                <div class="admin-photo-image">
                     <img src="${file.url}" alt="${file.name}" loading="lazy">
                 </div>
-                <div class="photo-overlay">
-                    <div class="flex justify-start">
-                        <label class="cursor-pointer" onclick="event.stopPropagation()">
-                            <input type="checkbox" class="select-checkbox" data-path="${file.path}" style="width:18px;height:18px;accent-color:var(--primary);">
-                        </label>
+                <div class="photo-grid-overlay">
+                    <div class="photo-grid-overlay-top">
+                        <div class="photo-grid-checkbox">
+                            <label class="label">
+                                <input type="checkbox" class="input" data-path="${file.path}" aria-label="Select Photo">
+                                <span class="sr-only">Select Photo</span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="flex justify-end gap-1 photo-actions">
-                        <button class="btn-icon view-btn" title="View" data-url="${file.url}">
-                            <span class="material-symbols-outlined" style="font-size:18px;">visibility</span>
-                        </button>
-                        <button class="btn-icon delete-btn" title="Delete" data-path="${file.path}" data-name="${file.name}">
-                            <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
-                        </button>
+                    <div class="photo-grid-overlay-bottom">
+                        <div class="photo-grid-actions">
+                            <button class="btn-icon" data-action="view" aria-label="View Photo">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                            <button class="btn-icon" data-action="delete" aria-label="Delete Photo">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
                     </div>
+                </div>
+                <div class="photo-grid-info">
+                    <div class="photo-grid-name">${file.name}</div>
                 </div>
             `;
 
-            // Click on image to view
-            div.addEventListener('click', (e) => {
-                if (e.target.closest('.delete-btn') || e.target.closest('.view-btn') || e.target.closest('.select-checkbox')) return;
-                this.showPhotoModal(file.url, file.name);
-            });
-
-            // View button
-            div.querySelector('.view-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showPhotoModal(file.url, file.name);
-            });
-
-            // Delete button
-            div.querySelector('.delete-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.confirmDelete(file.path, file.name);
-            });
-
-            // Checkbox for multi-select
-            div.querySelector('.select-checkbox').addEventListener('change', (e) => {
+            // Handle checkbox selection
+            const checkbox = div.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', (e) => {
                 e.stopPropagation();
                 if (e.target.checked) {
                     this.selectedItems.add(file.path);
@@ -307,6 +301,26 @@ class GuestUploadManager {
                 this.updateSelectionFab();
             });
 
+            // Handle action buttons
+            const actionButtons = div.querySelectorAll('.btn-icon');
+            actionButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = button.getAttribute('data-action');
+                    if (action === 'view') {
+                        this.showPhotoModal(file.url, file.name);
+                    } else if (action === 'delete') {
+                        this.confirmDelete(file.path, file.name);
+                    }
+                });
+            });
+
+            // Click on image to view
+            div.addEventListener('click', (e) => {
+                if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.btn-icon')) return;
+                this.showPhotoModal(file.url, file.name);
+            });
+
             fileGrid.appendChild(div);
         });
     }
@@ -315,7 +329,7 @@ class GuestUploadManager {
 
     clearSelection() {
         this.selectedItems.clear();
-        document.querySelectorAll('.select-checkbox').forEach(cb => {
+        document.querySelectorAll('.photo-grid-checkbox input[type="checkbox"]').forEach(cb => {
             cb.checked = false;
         });
         document.querySelectorAll('.file-item.selected').forEach(el => {
