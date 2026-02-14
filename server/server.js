@@ -6,10 +6,13 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs-extra');
 const session = require('express-session');
+const cookieParser = require('cookie-parser');
 
 // Import middleware
 const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
+const { helmetConfig } = require('./middleware/security');
+const { csrfProtection, attachCsrfToken, handleCsrfError, addCsrfTokenToResponse } = require('./middleware/csrf');
 
 // Import routes
 const routes = require('./routes');
@@ -20,10 +23,17 @@ const PORT = process.env.PORT || 3000;
 // Trust proxy if running behind reverse proxy
 app.set('trust proxy', 1);
 
+// Security headers via Helmet
+app.use(helmetConfig);
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : true,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Session configuration
 const sessionSecret = process.env.SESSION_SECRET;
@@ -47,6 +57,36 @@ app.use(session({
 
 app.use(logger);
 
+// CSRF protection (after cookie parser and before routes)
+// Apply CSRF protection to all routes except public API endpoints
+app.use((req, res, next) => {
+  // Skip CSRF for public endpoints that don't modify state
+  const publicPaths = [
+    '/api/health',
+    '/api/random-image',
+    '/api/images/random',
+    '/api/images/',
+    '/api/folders',
+    '/api/upload-tokens/validate',
+    '/api/auth/session'
+  ];
+  
+  const isPublicEndpoint = publicPaths.some(path => req.path.startsWith(path));
+  const isGetRequest = req.method === 'GET';
+  const isTokenUpload = req.path === '/api/token/upload' || req.path === '/api/token/folders';
+  
+  // Skip CSRF for public GET requests and token-based uploads (which use token auth)
+  if (isPublicEndpoint && isGetRequest || isTokenUpload) {
+    return next();
+  }
+  
+  csrfProtection(req, res, next);
+});
+
+// Attach CSRF token to responses
+app.use(attachCsrfToken);
+app.use(addCsrfTokenToResponse);
+
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
@@ -58,6 +98,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // Routes
 app.use('/', routes);
+
+// CSRF error handler (before general error handler)
+app.use(handleCsrfError);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

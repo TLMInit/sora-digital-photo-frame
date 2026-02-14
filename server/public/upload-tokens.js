@@ -13,6 +13,21 @@ class UploadTokensManager {
         this.loadFolders();
     }
 
+    // Helper method to add CSRF token to fetch options
+    addCsrfToken(options = {}) {
+        if (window.csrfManager) {
+            return window.csrfManager.addToRequest(options);
+        }
+        return options;
+    }
+
+    // Helper method to update CSRF token from response
+    updateCsrfToken(data) {
+        if (window.csrfManager && data) {
+            window.csrfManager.updateFromResponse(data);
+        }
+    }
+
     bindEvents() {
         // Back button
         document.getElementById('backBtn').addEventListener('click', () => {
@@ -73,10 +88,12 @@ class UploadTokensManager {
     async loadTokens() {
         try {
             this.showLoading();
-            const response = await fetch('/api/upload-tokens', { credentials: 'include' });
+            const options = this.addCsrfToken({ credentials: 'include' });
+            const response = await fetch('/api/upload-tokens', options);
             const data = await response.json();
             
             if (response.ok) {
+                this.updateCsrfToken(data);
                 this.tokens = data.tokens || [];
                 this.renderTokens();
             } else {
@@ -92,10 +109,12 @@ class UploadTokensManager {
 
     async loadFolders() {
         try {
-            const response = await fetch('/api/folders', { credentials: 'include' });
+            const options = this.addCsrfToken({ credentials: 'include' });
+            const response = await fetch('/api/folders', options);
             const data = await response.json();
             
             if (response.ok && data.folders) {
+                this.updateCsrfToken(data);
                 this.folders = data.folders.map(folder => ({
                     name: folder.name,
                     path: folder.path || folder.name
@@ -292,16 +311,18 @@ class UploadTokensManager {
                 uploadLimit: formData.get('uploadLimit') ? parseInt(formData.get('uploadLimit')) : null
             };
 
-            const response = await fetch('/api/upload-tokens', {
+            const options = this.addCsrfToken({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(tokenData)
             });
 
+            const response = await fetch('/api/upload-tokens', options);
             const data = await response.json();
 
             if (response.ok && data.success) {
+                this.updateCsrfToken(data);
                 this.closeTokenModal();
                 this.showTokenCreated(data.plainToken, data.token);
                 await this.loadTokens();
@@ -360,16 +381,18 @@ class UploadTokensManager {
 
     async toggleToken(tokenId, enabled) {
         try {
-            const response = await fetch(`/api/upload-tokens/${tokenId}`, {
+            const options = this.addCsrfToken({
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ enabled })
             });
 
+            const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
             const data = await response.json();
 
             if (response.ok && data.success) {
+                this.updateCsrfToken(data);
                 this.showToast(enabled ? 'Link enabled' : 'Link disabled', 'success');
                 await this.loadTokens();
             } else {
@@ -389,14 +412,16 @@ class UploadTokensManager {
     async deleteToken() {
         try {
             const tokenId = this.currentDeleteToken;
-            const response = await fetch(`/api/upload-tokens/${tokenId}`, {
+            const options = this.addCsrfToken({
                 method: 'DELETE',
                 credentials: 'include'
             });
 
+            const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
             const data = await response.json();
 
             if (response.ok && data.success) {
+                this.updateCsrfToken(data);
                 this.showToast('Upload link deleted successfully', 'success');
                 this.closeDeleteModal();
                 await this.loadTokens();
