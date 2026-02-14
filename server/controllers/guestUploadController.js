@@ -21,6 +21,67 @@ class GuestUploadController {
         return resolved.startsWith(this.resolvedServerRoot);
     }
 
+    // Get folder contents for token-based uploads - shows target folder only
+    async getFolderContentsWithToken(req, res) {
+        try {
+            const token = req.uploadToken;
+            const folderPath = token.targetFolder || 'uploads';
+
+            if (!this.isPathSafe(folderPath)) {
+                return res.status(400).json({ message: 'Invalid path' });
+            }
+
+            const fullPath = path.join(this.serverRoot, folderPath);
+
+            if (!await fs.pathExists(fullPath)) {
+                return res.status(404).json({ message: 'Folder not found' });
+            }
+
+            const items = await fs.readdir(fullPath, { withFileTypes: true });
+            const folders = [];
+            const files = [];
+
+            // Get list of files uploaded with this token
+            const tokenUploads = await uploadMetadataController.getUploadsByToken(token.id);
+            const tokenFilePaths = new Set(tokenUploads.map(u => u.filePath));
+
+            for (const item of items) {
+                if (item.isDirectory()) {
+                    folders.push({
+                        name: item.name,
+                        type: 'folder',
+                        path: path.join(folderPath, item.name)
+                    });
+                } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+                    const filePath = path.join(folderPath, item.name);
+                    // Only show files uploaded with this token
+                    if (tokenFilePaths.has(filePath)) {
+                        const relativePath = path.relative(
+                            this.uploadsDir,
+                            path.join(this.serverRoot, filePath)
+                        );
+                        files.push({
+                            name: item.name,
+                            type: 'image',
+                            path: filePath,
+                            url: `/uploads/${relativePath}`,
+                            ownedByUser: true
+                        });
+                    }
+                }
+            }
+
+            res.json({
+                currentPath: folderPath,
+                folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
+                files: files.sort((a, b) => a.name.localeCompare(b.name))
+            });
+        } catch (error) {
+            console.error('Error reading folder for token upload:', error);
+            res.status(500).json({ message: 'Server error' });
+        }
+    }
+
     // Get folder contents for guest users - shows server folders + only own uploaded files
     async getFolderContents(req, res) {
         try {
@@ -79,6 +140,78 @@ class GuestUploadController {
         } catch (error) {
             console.error('Error reading folder for guest:', error);
             res.status(500).json({ message: 'Server error' });
+        }
+    }
+
+    // Upload images with token
+    async uploadImagesWithToken(req, res) {
+        try {
+            const uploadedFiles = req.files;
+            const token = req.uploadToken;
+            const uploadTokenController = require('./uploadTokenController');
+            
+            const targetPath = token.targetFolder || 'uploads';
+            const processedFiles = [];
+            const uploadedPaths = [];
+
+            if (!this.isPathSafe(targetPath)) {
+                return res.status(400).json({ message: 'Invalid path' });
+            }
+
+            for (const file of uploadedFiles) {
+                const targetDir = path.join(this.serverRoot, targetPath);
+                const targetFilePath = path.join(targetDir, file.filename);
+
+                await fs.ensureDir(targetDir);
+
+                const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
+
+                await sharp(file.path)
+                    .rotate()
+                    .resize(
+                        parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
+                        parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
+                        { fit: 'inside', withoutEnlargement: true }
+                    )
+                    .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+                    .toFile(processedPath);
+
+                await fs.remove(file.path);
+                await fs.move(processedPath, targetFilePath);
+
+                const relativeFilePath = path.join(targetPath, file.filename);
+                uploadedPaths.push(relativeFilePath);
+
+                processedFiles.push({
+                    filename: file.filename,
+                    originalname: file.originalname,
+                    path: targetFilePath,
+                    size: file.size
+                });
+            }
+
+            // Record upload metadata with token ID
+            await uploadMetadataController.recordTokenUploads(token.id, token.name, uploadedPaths);
+
+            // Increment the upload count for this token
+            await uploadTokenController.incrementUploadCount(token.id);
+
+            // Clear image cache
+            imageController.clearImageCache();
+
+            res.json({
+                success: true,
+                message: 'Images uploaded successfully',
+                files: processedFiles,
+                uploadCount: token.uploadCount + uploadedFiles.length,
+                uploadLimit: token.uploadLimit
+            });
+        } catch (error) {
+            console.error('Error uploading images with token:', error);
+            res.status(500).json({ 
+                success: false,
+                message: 'Server error' 
+            });
         }
     }
 

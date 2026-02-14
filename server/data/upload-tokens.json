@@ -1,0 +1,78 @@
+[
+  {
+    "id": "712693ede2eae8f7aac3ef39ed812adc",
+    "tokenHash": "$2a$10$sc/g3TcalD04ZfIccLHmQOSi9aDTkzqwaPdVkImZqWR.F46MB3ofe",
+    "name": "Test Event 2024",
+    "createdAt": 1771080935160,
+    "expiresAt": 1773672935063,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "admin"
+  },
+  {
+    "id": "d7080ac048f44f5b9c8a8f016e7bf250",
+    "tokenHash": "$2a$10$Qf78O1LBe6tFj3owc7/AjOrZeACTqU/X7wxzO.yg6u4totsF0ghia",
+    "name": "Test Token - Never Expires",
+    "createdAt": 1771082358966,
+    "expiresAt": null,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "test"
+  },
+  {
+    "id": "d668aac981cbbe5d53524bc41e106b9f",
+    "tokenHash": "$2a$10$cCBp2WCbCnQVF7zI7e3Hye6JZ8z9J42QzC7qidSPsPXgVezlbA67y",
+    "name": "Test Token - 7 Days",
+    "createdAt": 1771082359047,
+    "expiresAt": 1771687159047,
+    "uploadLimit": 50,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "vacation",
+    "createdBy": "test"
+  },
+  {
+    "id": "48cd6086a68f637dba261b112781af2c",
+    "tokenHash": "$2a$10$sfPjnbBzM4me7O/Az0gVGebUcrHW03vs2jGiXDbeksOK4QEwoCcoe",
+    "name": "Test Token - Expired",
+    "createdAt": 1770218359284,
+    "expiresAt": 1770995959284,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "test"
+  },
+  {
+    "id": "9855808943afe586d47b9296e102ae78",
+    "tokenHash": "$2a$10$wyvc45LyebI9FR/F/4kmqeTt8z.bI5OdBN2iAy8AcnKDowewXv2SW",
+    "name": "Test Token - Limited",
+    "createdAt": 1771082359365,
+    "expiresAt": 1773674359365,
+    "uploadLimit": 5,
+    "uploadCount": 5,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "test"
+  },
+  {
+    "id": "6cedb850f0def47ae9bfd9a5efb4ca23",
+    "tokenHash": "$2a$10$yTIW4M44OiUBS8F0tfyUl.n5PqNMBiQ49D6EzjaftpPEDOWOxnSAO",
+    "encryptedToken": {
+      "encrypted": "5f7f00ee3f68595a35587159796e273e60fba065693f4f5de588fcbb61ef8eb60298d5e5e543c13ae370fb8ad2dcf9bd",
+      "iv": "c8b9aea6019299c43147c2e78f5d1d7a"
+    },
+    "name": "Test QR Code Fix",
+    "createdAt": 1771083259486,
+    "expiresAt": 1771688059393,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "admin"
+  }
+]

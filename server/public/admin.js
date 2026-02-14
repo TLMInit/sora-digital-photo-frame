@@ -59,11 +59,28 @@ class PhotoFrameAdmin {
         }, 2000);
     }
 
-    // Wrapper for fetch with session handling
+    // Wrapper for fetch with session handling and CSRF protection
     async authenticatedFetch(url, options = {}) {
         try {
+            // Add CSRF token to request
+            if (window.csrfManager) {
+                options = window.csrfManager.addToRequest(options);
+            }
+            
             const response = await fetch(url, options);
             const handledResponse = await this.handleApiResponse(response);
+            
+            // Update CSRF token from response if available
+            if (handledResponse && handledResponse.ok && window.csrfManager) {
+                try {
+                    const clone = handledResponse.clone();
+                    const data = await clone.json();
+                    window.csrfManager.updateFromResponse(data);
+                } catch (e) {
+                    // Ignore if response is not JSON
+                }
+            }
+            
             return handledResponse;
         } catch (error) {
             console.error('Network error:', error);
@@ -106,6 +123,11 @@ class PhotoFrameAdmin {
         // Navigation
         document.getElementById('backBtn').addEventListener('click', () => this.navigateBack());
         
+        // Upload Tokens
+        document.getElementById('uploadTokensBtn').addEventListener('click', () => {
+            window.location.href = '/upload-tokens';
+        });
+
         // Access Accounts
         document.getElementById('accessAccountsBtn').addEventListener('click', () => {
             window.location.href = '/access-accounts';

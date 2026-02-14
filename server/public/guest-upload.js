@@ -5,107 +5,71 @@ class GuestUploadManager {
         this.emptyStateSelectedFiles = [];
         this.selectedItems = new Set();
         this.deleteTarget = null;
-        this.accountInfo = null;
+        this.uploadToken = null;
+        this.tokenInfo = null;
 
-        this.checkSession();
+        this.checkToken();
     }
 
-    async checkSession() {
+    async checkToken() {
+        // Get token from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        this.uploadToken = urlParams.get('token');
+
+        if (!this.uploadToken) {
+            this.showTokenError('No Upload Link', 'This page requires a valid upload link. Please use the link provided to you.');
+            return;
+        }
+
         try {
-            const response = await fetch('/api/auth/session', { credentials: 'include' });
+            // Validate the token
+            const response = await fetch(`/api/upload-tokens/validate?token=${encodeURIComponent(this.uploadToken)}`);
             const data = await response.json();
 
-            if (!data.authenticated || !data.account || !data.account.uploadAccess) {
-                this.showPinLogin();
+            if (!response.ok || !data.success) {
+                this.showTokenError('Invalid Upload Link', data.error || 'This upload link is invalid or has expired.');
                 return;
             }
 
-            this.accountInfo = data.account;
-            document.getElementById('userName').textContent = `Welcome, ${data.account.name}`;
+            this.tokenInfo = data.token;
+            this.currentPath = this.tokenInfo.targetFolder || 'uploads';
+            
+            // Update UI with token info
+            document.getElementById('uploadTitle').textContent = this.tokenInfo.name || 'Upload Photos';
+            
+            // Show upload stats if there's a limit
+            if (this.tokenInfo.uploadLimit) {
+                document.getElementById('uploadStats').style.display = 'block';
+                document.getElementById('uploadCount').textContent = this.tokenInfo.uploadCount || 0;
+                document.getElementById('uploadLimitText').textContent = `/ ${this.tokenInfo.uploadLimit}`;
+            }
+
+            // Show expiration warning if close to expiry (within 7 days)
+            if (this.tokenInfo.expiresAt) {
+                const daysUntilExpiry = Math.ceil((this.tokenInfo.expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
+                if (daysUntilExpiry <= 7 && daysUntilExpiry > 0) {
+                    this.showToast(`This upload link expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'}`, 'warning');
+                }
+            }
+
             this.showApp();
             this.init();
         } catch (error) {
-            console.error('Session check failed:', error);
-            this.showPinLogin();
+            console.error('Token validation error:', error);
+            this.showTokenError('Connection Error', 'Unable to validate upload link. Please check your connection and try again.');
         }
     }
 
-    showPinLogin() {
-        document.getElementById('pinLoginOverlay').style.display = 'flex';
+    showTokenError(title, message) {
+        document.getElementById('tokenErrorTitle').textContent = title;
+        document.getElementById('tokenErrorText').textContent = message;
+        document.getElementById('tokenErrorOverlay').style.display = 'flex';
         document.getElementById('appContainer').classList.add('hidden');
-        if (!this.pinLoginInitialized) {
-            this.pinLoginInitialized = true;
-            this.setupPinLogin();
-        }
     }
 
     showApp() {
-        document.getElementById('pinLoginOverlay').style.display = 'none';
+        document.getElementById('tokenErrorOverlay').style.display = 'none';
         document.getElementById('appContainer').classList.remove('hidden');
-    }
-
-    setupPinLogin() {
-        const form = document.getElementById('pinLoginForm');
-        const pinInput = document.getElementById('pinInput');
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const pin = pinInput.value.trim();
-            if (!pin) return;
-
-            const btn = document.getElementById('pinLoginBtn');
-            const spinner = document.getElementById('pinSpinner');
-            const btnText = form.querySelector('.pin-btn-text');
-            const errorDiv = document.getElementById('pinErrorMessage');
-            const errorText = document.getElementById('pinErrorText');
-
-            btn.disabled = true;
-            btnText.textContent = 'Signing in...';
-            spinner.style.display = 'inline-block';
-            errorDiv.style.display = 'none';
-
-            try {
-                const response = await fetch('/api/auth/pin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ pin })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    if (!data.account.uploadAccess) {
-                        errorText.textContent = 'Your account does not have upload access.';
-                        errorDiv.style.display = 'grid';
-                    } else {
-                        this.accountInfo = data.account;
-                        document.getElementById('userName').textContent = `Welcome, ${data.account.name}`;
-                        this.showApp();
-                        this.init();
-                    }
-                } else {
-                    let message = data.error || 'Invalid PIN';
-                    if (data.attemptsRemaining !== undefined) {
-                        message += ` (${data.attemptsRemaining} attempts remaining)`;
-                    }
-                    errorText.textContent = message;
-                    errorDiv.style.display = 'grid';
-                }
-            } catch (error) {
-                console.error('PIN login error:', error);
-                errorText.textContent = 'Connection error. Please try again.';
-                errorDiv.style.display = 'grid';
-            } finally {
-                btn.disabled = false;
-                btnText.textContent = 'Sign In';
-                spinner.style.display = 'none';
-            }
-        });
-
-        pinInput.addEventListener('input', () => {
-            document.getElementById('pinErrorMessage').style.display = 'none';
-        });
     }
 
     init() {
@@ -174,9 +138,6 @@ class GuestUploadManager {
             this.updateThemeButton(nextMode);
         });
         this.updateThemeButton(localStorage.getItem('themeMode') || 'system');
-
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
 
         // Dialog backdrop clicks
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -277,23 +238,24 @@ class GuestUploadManager {
     async loadFolderContents() {
         this.clearSelection();
         try {
-            const response = await fetch(`/api/guest/folders?path=${encodeURIComponent(this.currentPath)}`, {
+            const response = await fetch(`/api/token/folders?token=${encodeURIComponent(this.uploadToken)}`, {
                 credentials: 'include'
             });
 
-            if (response.status === 401) {
-                this.showPinLogin();
+            if (!response.ok) {
+                const data = await response.json();
+                if (response.status === 403 || response.status === 401) {
+                    this.showTokenError('Upload Link Error', data.error || 'This upload link is no longer valid.');
+                    return;
+                }
+                this.showToast(data.message || 'Failed to load folder contents', 'error');
                 return;
             }
 
             const data = await response.json();
-            if (response.ok) {
-                this.renderFolderContents(data);
-                this.updateBreadcrumb();
-                this.updateBackButton();
-            } else {
-                this.showToast(data.message || 'Failed to load folder contents', 'error');
-            }
+            this.renderFolderContents(data);
+            this.updateBreadcrumb();
+            this.updateBackButton();
         } catch (error) {
             console.error('Error loading folder contents:', error);
             this.showToast('Failed to load folder contents', 'error');
@@ -563,12 +525,11 @@ class GuestUploadManager {
         this.selectedFiles.forEach(file => {
             formData.append('images', file);
         });
-        formData.append('path', this.currentPath);
 
         this.showUploadProgress();
 
         try {
-            const response = await fetch('/api/guest/upload', {
+            const response = await fetch(`/api/token/upload?token=${encodeURIComponent(this.uploadToken)}`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
@@ -576,12 +537,18 @@ class GuestUploadManager {
 
             const data = await response.json();
 
-            if (response.ok) {
+            if (response.ok && data.success) {
                 this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
+                
+                // Update upload count display
+                if (this.tokenInfo.uploadLimit) {
+                    document.getElementById('uploadCount').textContent = data.uploadCount || 0;
+                }
+                
                 this.hideUploadModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Upload failed', 'error');
+                this.showToast(data.error || data.message || 'Upload failed', 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
@@ -715,7 +682,6 @@ class GuestUploadManager {
         this.emptyStateSelectedFiles.forEach(file => {
             formData.append('images', file);
         });
-        formData.append('path', this.currentPath);
 
         document.getElementById('emptyStateUploadProgress').classList.remove('hidden');
         const progressFill = document.querySelector('.empty-state-progress-fill');
@@ -729,7 +695,7 @@ class GuestUploadManager {
         }, 200);
 
         try {
-            const response = await fetch('/api/guest/upload', {
+            const response = await fetch(`/api/token/upload?token=${encodeURIComponent(this.uploadToken)}`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
@@ -737,12 +703,18 @@ class GuestUploadManager {
 
             const data = await response.json();
 
-            if (response.ok) {
+            if (response.ok && data.success) {
                 this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
+                
+                // Update upload count display
+                if (this.tokenInfo.uploadLimit) {
+                    document.getElementById('uploadCount').textContent = data.uploadCount || 0;
+                }
+                
                 this.resetEmptyStateUpload();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Upload failed', 'error');
+                this.showToast(data.error || data.message || 'Upload failed', 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
@@ -758,24 +730,6 @@ class GuestUploadManager {
         this.updateEmptyStateUploadButton();
         this.updateEmptyStateFilesDisplay();
         document.getElementById('emptyStateUploadProgress').classList.add('hidden');
-    }
-
-    // --- Logout ---
-
-    async logout() {
-        try {
-            await fetch('/api/auth/session', {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            this.showToast('Signing out...', 'info');
-            setTimeout(() => {
-                window.location.href = '/slideshow';
-            }, 1000);
-        } catch (error) {
-            console.error('Error during logout:', error);
-            window.location.href = '/slideshow';
-        }
     }
 
     // --- Toast ---
@@ -800,4 +754,9 @@ class GuestUploadManager {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new GuestUploadManager();
+    
+    // Initialize Google Photos sync if enabled
+    if (typeof GooglePhotosSync !== 'undefined') {
+        new GooglePhotosSync();
+    }
 });

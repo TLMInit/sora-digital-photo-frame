@@ -12,6 +12,21 @@ class AccessAccountsManager {
         this.loadFolders();
     }
 
+    // Helper method to add CSRF token to fetch options
+    addCsrfToken(options = {}) {
+        if (window.csrfManager) {
+            return window.csrfManager.addToRequest(options);
+        }
+        return options;
+    }
+
+    // Helper method to update CSRF token from response
+    updateCsrfToken(data) {
+        if (window.csrfManager && data) {
+            window.csrfManager.updateFromResponse(data);
+        }
+    }
+
     bindEvents() {
         // Back button
         document.getElementById('backBtn').addEventListener('click', () => {
@@ -59,10 +74,12 @@ class AccessAccountsManager {
     async loadAccounts() {
         try {
             this.showLoading();
-            const response = await fetch('/api/access-accounts');
+            const options = this.addCsrfToken();
+            const response = await fetch('/api/access-accounts', options);
             const data = await response.json();
             
             if (response.ok) {
+                this.updateCsrfToken(data);
                 this.accounts = data.accounts || [];
                 this.renderAccounts();
             } else {
@@ -78,10 +95,12 @@ class AccessAccountsManager {
 
     async loadFolders() {
         try {
-            const response = await fetch('/api/folders');
+            const options = this.addCsrfToken();
+            const response = await fetch('/api/folders', options);
             const data = await response.json();
             
             if (response.ok && data.folders) {
+                this.updateCsrfToken(data);
                 this.folders = data.folders.map(folder => ({
                     name: folder.name,
                     path: folder.path || folder.name,
@@ -349,11 +368,15 @@ class AccessAccountsManager {
         const accountId = document.getElementById('confirmDeleteBtn').getAttribute('data-account-id');
         
         try {
-            const response = await fetch(`/api/access-accounts/${accountId}`, {
+            const options = this.addCsrfToken({
                 method: 'DELETE'
             });
 
+            const response = await fetch(`/api/access-accounts/${accountId}`, options);
+
             if (response.ok) {
+                const data = await response.json();
+                this.updateCsrfToken(data);
                 this.showToast('Account deleted successfully', 'success');
                 this.closeDeleteModal();
                 this.loadAccounts();

@@ -717,39 +717,20 @@
 </head>
 
 <body>
-    <!-- PIN Login Overlay -->
-    <div id="pinLoginOverlay" class="pin-login-overlay">
+    <!-- Token Required/Error Overlay -->
+    <div id="tokenErrorOverlay" class="pin-login-overlay" style="display: none;">
         <div class="w-full max-w-md">
             <div class="card justify-center">
                 <header class="flex flex-col items-center justify-center">
-                    <div class="btn-lg-icon-outline">📷</div>
-                    <h2>Upload Photos</h2>
+                    <div class="btn-lg-icon-outline">🔗</div>
+                    <h2>Upload Link Required</h2>
                 </header>
                 <section>
-                    <form class="form grid gap-6" id="pinLoginForm">
-                        <p class="text-muted-foreground">Enter your PIN to access photo uploads</p>
-                        <div class="grid gap-2">
-                            <label for="pinInput" class="label">PIN</label>
-                            <input type="password" name="pin" class="input" placeholder="Enter your PIN" required
-                                autocomplete="off" id="pinInput" inputmode="numeric">
-                            <p class="text-muted-foreground text-sm">Enter the PIN provided to you by the photo frame owner.</p>
-                        </div>
-                        <button type="submit" class="btn" id="pinLoginBtn">
-                            <span class="pin-btn-text">Sign In</span>
-                            <div class="spinner" id="pinSpinner"></div>
-                        </button>
-                        <div id="pinErrorMessage" class="alert-destructive" style="display: none;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" x2="12" y1="8" y2="12" />
-                                <line x1="12" x2="12.01" y1="16" y2="16" />
-                            </svg>
-                            <h2>Login Failed</h2>
-                            <section id="pinErrorText"></section>
-                        </div>
-                    </form>
+                    <div class="alert-destructive">
+                        <span class="material-symbols-outlined">warning</span>
+                        <h2 id="tokenErrorTitle">Invalid Upload Link</h2>
+                        <section id="tokenErrorText">This page requires a valid upload link. Please use the link provided to you.</section>
+                    </div>
                 </section>
                 <footer>
                     <a href="/slideshow" class="btn-link">
@@ -769,20 +750,24 @@
                 </button>
                 <h1 class="text-xl font-semibold">
                     <span class="material-symbols-outlined align-middle mr-1">upload</span>
-                    Upload Photos
+                    <span id="uploadTitle">Upload Photos</span>
                 </h1>
-                <span id="userName" class="text-sm text-muted-foreground"></span>
             </div>
             <div class="flex items-center gap-2">
+                <div id="uploadStats" class="text-sm text-muted-foreground" style="display: none;">
+                    <span id="uploadCount">0</span> 
+                    <span id="uploadLimitText"></span>
+                </div>
+                <button id="googlePhotosBtn" class="btn-outline" title="Import from Google Photos" style="display:none;">
+                    <span class="material-symbols-outlined">photo_library</span>
+                    Google Photos
+                </button>
                 <button id="uploadBtn" class="btn" title="Upload Images">
                     <span class="material-symbols-outlined">upload</span>
                     Upload
                 </button>
                 <button id="themeToggle" class="btn-icon" title="Switch theme">
                     <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
-                </button>
-                <button id="logoutBtn" class="btn-icon" title="Sign Out">
-                    <span class="material-symbols-outlined">logout</span>
                 </button>
             </div>
         </header>
@@ -949,10 +934,46 @@
             <span class="fab-badge" id="fabBadge">0</span>
         </div>
 
+        <!-- Google Photos Modal -->
+        <div id="googlePhotosModal" class="modal hidden">
+            <div class="modal-content card card-elevated">
+                <h2 class="light-title">Import from Google Photos</h2>
+                <div class="google-photos-content">
+                    <div id="sessionLoadingState" class="session-state">
+                        <div class="session-loader">
+                            <div class="spinner"></div>
+                        </div>
+                        <p>Creating Google Photos session...</p>
+                    </div>
+                    <div id="sessionReadyState" class="session-state hidden">
+                        <div class="session-icon">
+                            <span class="material-symbols-outlined">photo_library</span>
+                        </div>
+                        <p>Google Photos session is ready!</p>
+                        <button id="openSessionBtn" class="btn btn-primary">
+                            <span class="material-symbols-outlined">open_in_new</span>
+                            Open Google Photos Picker
+                        </button>
+                    </div>
+                    <div id="sessionErrorState" class="session-state hidden">
+                        <div class="session-icon error">
+                            <span class="material-symbols-outlined">error</span>
+                        </div>
+                        <p id="sessionErrorMessage">Failed to create session</p>
+                        <button id="retrySessionBtn" class="btn btn-secondary">Try Again</button>
+                    </div>
+                </div>
+                <button id="closeGooglePhotosModal" class="modal-close-btn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Basecoat Toast Container -->
         <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end"></div>
     </div>
 
+    <script src="js/googlePhotosSync.js"></script>
     <script src="guest-upload.js"></script>
 </body>
 

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <title>Guest Upload Links - Digital Photo Frame Admin</title>
+    <script src="/js/csrf.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    
+    <style>
+        /* Basecoat-style body CSS with theme support */
+        body {
+            background: var(--background);
+            color: var(--foreground);
+            overscroll-behavior: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+        }
+
+        .tokens-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+        }
+
+        .token-card {
+            position: relative;
+        }
+
+        .token-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .token-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .token-info {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .token-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .token-status.active {
+            background: var(--success);
+            color: var(--success-foreground);
+        }
+
+        .token-status.disabled {
+            background: var(--muted);
+            color: var(--muted-foreground);
+        }
+
+        .token-status.expired {
+            background: var(--destructive);
+            color: var(--destructive-foreground);
+        }
+
+        .token-link {
+            padding: 0.5rem;
+            background: var(--muted);
+            border-radius: var(--radius);
+            font-family: monospace;
+            font-size: 0.75rem;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .token-link-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .qr-code-container {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .qr-code-container canvas {
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .loading-state,
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+
+        .loading-state .material-symbols-outlined,
+        .empty-state .material-symbols-outlined {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+
+        .folder-select {
+            position: relative;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header class="flex items-center justify-between p-4 border-b bg-card">
+            <div class="flex items-center gap-4">
+                <button id="backBtn" class="btn-icon" title="Back to Admin">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <h1 class="text-xl font-semibold">Guest Upload Links</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="createTokenBtn" class="btn" title="Create Upload Link">
+                    <span class="material-symbols-outlined">add_link</span>
+                    New Upload Link
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div id="loadingState" class="loading-state">
+                <span class="material-symbols-outlined">hourglass_empty</span>
+                <p>Loading upload links...</p>
+            </div>
+
+            <div id="tokensList" class="tokens-grid hidden">
+                <!-- Tokens will be populated here -->
+            </div>
+
+            <div id="emptyState" class="empty-state hidden">
+                <span class="material-symbols-outlined">link</span>
+                <h3 class="text-lg font-medium mb-2">No upload links yet</h3>
+                <p class="text-muted-foreground">Create an upload link to allow guests to upload photos</p>
+            </div>
+        </main>
+
+        <!-- Create/Edit Token Modal -->
+        <dialog id="tokenModal" class="dialog" aria-labelledby="modal-title">
+            <article>
+                <header>
+                    <h2 id="modal-title">Create Upload Link</h2>
+                    <button id="closeTokenModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <form class="form grid gap-6" id="tokenForm">
+                        <div class="grid gap-2">
+                            <label for="tokenName" class="label">Link Name</label>
+                            <input type="text" name="name" class="input" placeholder="e.g., Wedding Guests, Birthday Party" required id="tokenName">
+                            <p class="text-sm text-muted-foreground">Give this link a memorable name</p>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <label for="targetFolder" class="label">Target Folder</label>
+                            <select name="targetFolder" class="input" id="targetFolder">
+                                <option value="uploads">uploads (default)</option>
+                            </select>
+                            <p class="text-sm text-muted-foreground">Where should uploaded photos go?</p>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <label for="expiresInDays" class="label">Expires In (Days)</label>
+                            <input type="number" name="expiresInDays" class="input" placeholder="30" min="0" max="365" value="30" id="expiresInDays">
+                            <p class="text-sm text-muted-foreground">Set to 0 for links that never expire</p>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <label for="uploadLimit" class="label">Upload Limit (Optional)</label>
+                            <input type="number" name="uploadLimit" class="input" placeholder="No limit" min="1" id="uploadLimit">
+                            <p class="text-sm text-muted-foreground">Maximum number of photos that can be uploaded</p>
+                        </div>
+                    </form>
+                </section>
+                <footer>
+                    <button id="cancelTokenBtn" class="btn-outline">Cancel</button>
+                    <button id="saveTokenBtn" class="btn">
+                        <span class="material-symbols-outlined">add_link</span>
+                        Create Link
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Token Created Success Modal -->
+        <dialog id="tokenCreatedModal" class="dialog" aria-labelledby="created-title">
+            <article>
+                <header>
+                    <h2 id="created-title">Upload Link Created!</h2>
+                </header>
+                <section>
+                    <div class="alert-success mb-4">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <h2>Link Ready to Share</h2>
+                        <section>Your upload link has been created successfully. Save this link - it won't be shown again!</section>
+                    </div>
+
+                    <div class="grid gap-4">
+                        <div class="grid gap-2">
+                            <label class="label">Shareable Link</label>
+                            <div class="token-link">
+                                <span class="token-link-text" id="createdTokenLink"></span>
+                                <button type="button" class="btn-sm-icon" id="copyCreatedLinkBtn" title="Copy link">
+                                    <span class="material-symbols-outlined">content_copy</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <label class="label">QR Code</label>
+                            <div class="qr-code-container">
+                                <canvas id="createdTokenQR"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <footer>
+                    <button id="closeCreatedModalBtn" class="btn">Got It</button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- QR Code Modal -->
+        <dialog id="qrModal" class="dialog" aria-labelledby="qr-title">
+            <article>
+                <header>
+                    <h2 id="qr-title">QR Code - <span id="qrTokenName"></span></h2>
+                    <button id="closeQrModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <div class="qr-code-container">
+                        <canvas id="qrCanvas"></canvas>
+                    </div>
+                    <div class="text-center mt-4">
+                        <p class="text-sm text-muted-foreground mb-2">Scan this QR code to access the upload page</p>
+                        <div class="card bg-muted p-2 text-left">
+                            <p id="qrLinkText" class="text-xs break-all font-mono"></p>
+                        </div>
+                    </div>
+                </section>
+                <footer>
+                    <button id="downloadQrBtn" class="btn-outline">
+                        <span class="material-symbols-outlined">download</span>
+                        Download QR Code
+                    </button>
+                    <button id="closeQrModalBtn" class="btn">Close</button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Delete Confirmation Modal -->
+        <dialog id="deleteModal" class="dialog" aria-labelledby="delete-title">
+            <article>
+                <header>
+                    <h2 id="delete-title">Delete Upload Link</h2>
+                </header>
+                <section>
+                    <div class="alert-destructive">
+                        <span class="material-symbols-outlined">warning</span>
+                        <h2>Are you sure?</h2>
+                        <section>This upload link will be permanently deleted and can no longer be used to upload photos.</section>
+                    </div>
+                </section>
+                <footer>
+                    <button id="cancelDeleteBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmDeleteBtn" class="btn-destructive">
+                        <span class="material-symbols-outlined">delete</span>
+                        Delete Link
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+    </div>
+
+    <!-- QR Code Library - Local bundled version -->
+    <script src="/js/qrcode.min.js"></script>
+    <script src="/upload-tokens.js"></script>
+</body>
+
+</html>

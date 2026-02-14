@@ -5,8 +5,16 @@ const folderController = require('../controllers/folderController');
 const accessAccountController = require('../controllers/accessAccountController');
 const googlePhotosController = require('../controllers/googlePhotosController');
 const guestUploadController = require('../controllers/guestUploadController');
+const uploadTokenController = require('../controllers/uploadTokenController');
 const upload = require('../middleware/upload');
-const { requireAuth, requireUploadAuth } = require('../middleware/auth');
+const { requireAuth, requireUploadAuth, requireUploadToken } = require('../middleware/auth');
+const { 
+  tokenValidationLimiter, 
+  tokenUploadLimiter, 
+  tokenManagementLimiter,
+  authLimiter,
+  apiLimiter 
+} = require('../middleware/security');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -47,10 +55,23 @@ router.get('/features', requireAuth, (req, res) => {
     });
 });
 
-// PIN authentication routes (public)
-router.post('/auth/pin', accessAccountController.authenticateWithPin.bind(accessAccountController));
+// PIN authentication routes (public) - with rate limiting
+router.post('/auth/pin', authLimiter, accessAccountController.authenticateWithPin.bind(accessAccountController));
 router.get('/auth/session', accessAccountController.getSession.bind(accessAccountController));
 router.delete('/auth/session', accessAccountController.clearSession.bind(accessAccountController));
+
+// Upload token management routes (admin only) - with rate limiting
+router.post('/upload-tokens', requireAuth, tokenManagementLimiter, uploadTokenController.createToken.bind(uploadTokenController));
+router.get('/upload-tokens', requireAuth, tokenManagementLimiter, uploadTokenController.getAllTokens.bind(uploadTokenController));
+router.patch('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.updateToken.bind(uploadTokenController));
+router.delete('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.deleteToken.bind(uploadTokenController));
+
+// Public token validation and upload routes (must come before /upload-tokens/:id to avoid route conflict)
+// With rate limiting to prevent abuse
+router.get('/upload-tokens/validate', tokenValidationLimiter, uploadTokenController.validateToken.bind(uploadTokenController));
+router.get('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.getToken.bind(uploadTokenController));
+router.post('/token/upload', tokenUploadLimiter, requireUploadToken, upload.array('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
+router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
 
 // Guest upload routes (requires PIN auth with upload access)
 router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));
