@@ -57,7 +57,7 @@ Cross-Site Request Forgery (CSRF) protection prevents malicious websites from pe
 
 #### Protected Operations
 
-- All POST, PUT, PATCH, DELETE requests
+- All POST, PUT, PATCH, DELETE requests (except exempted endpoints)
 - Admin panel operations
 - Token management
 - Access account management
@@ -65,9 +65,22 @@ Cross-Site Request Forgery (CSRF) protection prevents malicious websites from pe
 
 #### Exempted Operations
 
-- GET requests (read-only)
-- Token-based guest uploads (use cryptographic token authentication)
-- Public endpoints (health check, images, folders)
+**Authentication Endpoints** (must be accessible without CSRF for initial auth):
+- `/api/auth/login` - Admin login
+- `/api/auth/pin` - PIN authentication
+- `/api/auth/session` - Session status check
+
+**Public Read-Only Endpoints**:
+- GET requests (read-only operations)
+- `/api/health` - Health check
+- `/api/random-image` - Random image retrieval
+- `/api/folders` - Folder listing
+- `/api/images/*` - Image retrieval
+
+**Token-Based Uploads**:
+- `/api/token/upload` - Token-authenticated uploads (use cryptographic token auth)
+- `/api/token/folders` - Token-authenticated folder access
+- `/api/upload-tokens/validate` - Token validation endpoint
 
 #### Frontend Integration
 
@@ -337,6 +350,62 @@ Schedule regular security reviews:
 - [ ] Annual penetration testing
 - [ ] Continuous monitoring of logs
 
+## Troubleshooting
+
+### Common Issues
+
+#### Issue: "Custom keyGenerator appears to use request IP without calling the ipKeyGenerator helper"
+
+**Cause:** express-rate-limit v7+ requires proper IPv6 handling for custom keyGenerators.
+
+**Solution:** Use default rate limiting (already implemented). Custom keyGenerators must use the `ipKeyGenerator` helper for IPv6 support.
+
+#### Issue: Cannot Login - 403 Forbidden
+
+**Cause:** CSRF protection blocking authentication endpoints.
+
+**Solution:** Authentication endpoints (`/api/auth/login`, `/api/auth/pin`) are exempted from CSRF protection. If you added custom auth endpoints, add them to the exemption list in `server.js`:
+
+```javascript
+const publicPaths = [
+  // ... other paths
+  '/api/auth/login',
+  '/api/auth/pin',
+  '/api/your-custom-auth-endpoint'  // Add here
+];
+```
+
+#### Issue: Rate Limit Errors During Development
+
+**Cause:** Rate limiting active on localhost.
+
+**Solution:** Rate limiting is automatically disabled for localhost when `NODE_ENV=development`. Set this in your `.env` file:
+
+```bash
+NODE_ENV=development
+```
+
+#### Issue: Session Lost After Login
+
+**Cause:** Missing or incorrect `SESSION_SECRET`.
+
+**Solution:** Ensure `SESSION_SECRET` is set in `.env` with at least 32 characters:
+
+```bash
+SESSION_SECRET=your-random-32-char-secret-here
+```
+
+Generate a secure secret:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+#### Issue: CSRF Token Missing in API Responses
+
+**Cause:** CSRF middleware not properly initialized.
+
+**Solution:** Check that `attachCsrfToken` and `addCsrfTokenToResponse` middlewares are active. They automatically handle token injection.
+
 ## Support
 
 For security issues or questions:
@@ -350,5 +419,5 @@ For security issues or questions:
 ---
 
 **Last Updated**: 2026-02-14
-**Security Version**: 1.0.0
+**Security Version**: 1.0.1
 **CodeQL Status**: ✅ 0 vulnerabilities
