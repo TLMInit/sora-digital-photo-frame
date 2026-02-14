@@ -282,7 +282,7 @@ class GuestUploadManager {
             });
 
             if (response.status === 401) {
-                window.location.href = '/slideshow';
+                this.showPinLogin();
                 return;
             }
 
