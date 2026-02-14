@@ -912,7 +912,13 @@ class GooglePhotosSync {
   }
 }
 
-// Initialize when DOM is loaded
+// Initialize when DOM is loaded - but only on admin pages, not guest upload
 document.addEventListener('DOMContentLoaded', () => {
+  // Don't auto-initialize on the guest upload page - it has no admin session
+  // and the auth status check would trigger a redirect to login
+  if (window.location.pathname === '/guest-upload') {
+    console.log('🔧 [DEBUG] GooglePhotosSync: Skipping auto-init on guest upload page');
+    return;
+  }
   window.googlePhotosSync = new GooglePhotosSync();
 });
