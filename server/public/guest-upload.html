@@ -688,11 +688,80 @@
                 max-height: calc(100vh - 6rem);
             }
         }
+
+        /* PIN Login Overlay */
+        .pin-login-overlay {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .pin-login-overlay .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
 <body>
-    <div class="app">
+    <!-- PIN Login Overlay -->
+    <div id="pinLoginOverlay" class="pin-login-overlay">
+        <div class="w-full max-w-md">
+            <div class="card justify-center">
+                <header class="flex flex-col items-center justify-center">
+                    <div class="btn-lg-icon-outline">📷</div>
+                    <h2>Upload Photos</h2>
+                </header>
+                <section>
+                    <form class="form grid gap-6" id="pinLoginForm">
+                        <p class="text-muted-foreground">Enter your PIN to access photo uploads</p>
+                        <div class="grid gap-2">
+                            <label for="pinInput" class="label">PIN</label>
+                            <input type="password" name="pin" class="input" placeholder="Enter your PIN" required
+                                autocomplete="off" id="pinInput" inputmode="numeric">
+                            <p class="text-muted-foreground text-sm">Enter the PIN provided to you by the photo frame owner.</p>
+                        </div>
+                        <button type="submit" class="btn" id="pinLoginBtn">
+                            <span class="pin-btn-text">Sign In</span>
+                            <div class="spinner" id="pinSpinner"></div>
+                        </button>
+                        <div id="pinErrorMessage" class="alert-destructive" style="display: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" x2="12" y1="8" y2="12" />
+                                <line x1="12" x2="12.01" y1="16" y2="16" />
+                            </svg>
+                            <h2>Login Failed</h2>
+                            <section id="pinErrorText"></section>
+                        </div>
+                    </form>
+                </section>
+                <footer>
+                    <a href="/slideshow" class="btn-link">
+                        <span>🎬</span>
+                        View Slideshow
+                    </a>
+                </footer>
+            </div>
+        </div>
+    </div>
+
+    <div class="app hidden" id="appContainer">
         <header class="flex items-center justify-between p-4 border-b bg-card">
             <div class="flex items-center gap-4">
                 <button id="backBtn" class="btn-icon" title="Back" style="display:none;">

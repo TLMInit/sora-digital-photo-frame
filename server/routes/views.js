@@ -13,7 +13,7 @@ router.get('/login', requireGuest, viewController.serveLogin.bind(viewController
 router.get('/admin', requireAuth, viewController.serveAdmin.bind(viewController));
 router.get('/access-accounts', requireAuth, viewController.serveAccessAccounts.bind(viewController));
 
-// Guest upload page (requires PIN auth with upload access)
-router.get('/guest-upload', requireUploadAuth, viewController.serveGuestUpload.bind(viewController));
+// Guest upload page (PIN login is handled client-side)
+router.get('/guest-upload', viewController.serveGuestUpload.bind(viewController));
 
 module.exports = router;
