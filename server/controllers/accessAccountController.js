@@ -182,9 +182,17 @@ class AccessAccountController {
     async updateAccount(req, res) {
         try {
             const { id } = req.params;
-            const { name, pin, assignedFolders = [], uploadAccess } = req.body;
+            const { name, pin, assignedFolders = [], uploadAccess, keepPin } = req.body;
 
-            if (!name || !pin) {
+            if (!name) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Name is required'
+                });
+            }
+
+            // PIN is required unless keepPin flag is set
+            if (!keepPin && !pin) {
                 return res.status(400).json({
                     success: false,
                     error: 'Name and PIN are required'
@@ -202,8 +210,8 @@ class AccessAccountController {
                 });
             }
 
-            // If PIN is the masked placeholder, keep the existing hash
-            const pinToStore = (pin === '••••')
+            // If keepPin flag is set, keep existing hash; otherwise hash the new PIN
+            const pinToStore = keepPin
                 ? accounts[accountIndex].pin
                 : await bcrypt.hash(pin, 10);
 

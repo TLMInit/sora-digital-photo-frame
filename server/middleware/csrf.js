@@ -32,7 +32,16 @@ const csrfProtection = (req, res, next) => {
   const bodyToken = req.body && req.body._csrf;
   const submittedToken = headerToken || bodyToken;
 
-  if (!cookieToken || !submittedToken || cookieToken !== submittedToken) {
+  if (!cookieToken || !submittedToken || cookieToken.length !== submittedToken.length) {
+    const err = new Error('Invalid CSRF token');
+    err.code = 'EBADCSRFTOKEN';
+    return next(err);
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  const cookieBuf = Buffer.from(cookieToken);
+  const submittedBuf = Buffer.from(submittedToken);
+  if (!crypto.timingSafeEqual(cookieBuf, submittedBuf)) {
     const err = new Error('Invalid CSRF token');
     err.code = 'EBADCSRFTOKEN';
     return next(err);
