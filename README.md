@@ -28,12 +28,18 @@ Turn any device with a web browser into a smart, open-source digital photo frame
 
 ### 👨‍👩‍👧‍👦 Family-Friendly Features
 
-- **🎁 Guest Upload**: Perfect for family gatherings! Share a simple upload link with family members and friends, allowing them to contribute photos directly to your digital frame without needing admin access or technical knowledge.
-  - No login required for guests
-  - Secure, token-based access
-  - Easy to share via QR code or link
-  - Great for parties, reunions, and family events
-  - Guests can upload memories in real-time as events happen
+- **🎁 Guest Upload Links**: Perfect for family gatherings! Create secure upload links that allow family members and friends to contribute photos directly to your digital frame without needing admin access or technical knowledge.
+  - **No login required** - Just click the link and upload
+  - **Secure token-based access** - Cryptographically secure, one-time-use links
+  - **Customizable settings**:
+    - Set expiration dates (e.g., 30 days)
+    - Limit number of uploads per link
+    - Choose target folder for uploads
+    - Enable/disable links at any time
+  - **Easy to share** - Copy link or scan QR code
+  - **Perfect for events** - Weddings, birthdays, reunions, holidays
+  - **Real-time uploads** - Photos appear on your frame as they're uploaded
+  - **Track usage** - See how many photos have been uploaded with each link
 
 This makes SORA Frame ideal for keeping distant family members connected by allowing everyone to share moments that automatically appear on your display.
 
@@ -48,9 +54,30 @@ From there, you can:
 - **Organize**: Create and delete nested folders to organize your library.
 - **Supported formats**: JPEG, PNG, WebP, GIF.
 
-### Guest Upload for Family Events
+### Guest Upload Links for Family Events
 
-Want to let family members contribute photos without giving them admin access? Enable guest upload to generate a shareable link that anyone can use to upload photos directly to your frame. Perfect for weddings, reunions, holidays, and parties!
+SORA Frame makes it easy for everyone to contribute photos to your digital frame through secure, shareable upload links.
+
+#### How to Create Upload Links:
+
+1. **Access Admin Panel**: Navigate to `http://your-server-ip:3000/admin` and log in
+2. **Click "Guest Upload Links"**: Find the button in the admin toolbar
+3. **Create a New Link**:
+   - Give it a memorable name (e.g., "Birthday Party 2024")
+   - Choose where uploads should go (target folder)
+   - Set an expiration date (default: 30 days)
+   - Optionally set an upload limit (e.g., max 50 photos)
+4. **Share the Link**: Copy the URL or generate a QR code for easy mobile scanning
+5. **Manage Links**: View upload counts, disable links, or delete them when done
+
+#### Guest Experience:
+- No account creation or PIN required
+- Simply visit the link and start uploading
+- Drag-and-drop or browse to select photos
+- Instant upload confirmation
+- Photos appear on the frame immediately
+
+Perfect for weddings, reunions, holidays, parties, and any event where you want everyone to share their favorite moments!
 
 ### Viewing the Slideshow
 
