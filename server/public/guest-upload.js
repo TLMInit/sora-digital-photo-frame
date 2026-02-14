@@ -754,9 +754,4 @@ class GuestUploadManager {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new GuestUploadManager();
-    
-    // Initialize Google Photos sync if enabled
-    if (typeof GooglePhotosSync !== 'undefined') {
-        new GooglePhotosSync();
-    }
 });
