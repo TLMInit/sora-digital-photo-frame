@@ -363,11 +363,21 @@ class UploadTokensManager {
 
     async copyFullTokenLink(tokenId) {
         try {
-            // We need to get the actual token to build the link
-            // Since we don't store plain tokens, show a message
-            this.showToast('⚠️ For security, full links are only shown once when created', 'warning');
+            // Fetch the token with decrypted plain token
+            const options = this.addCsrfToken({ credentials: 'include' });
+            const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
+            const data = await response.json();
+            
+            if (response.ok && data.success && data.token.plainToken) {
+                this.updateCsrfToken(data);
+                const shareUrl = `${window.location.origin}/guest-upload?token=${data.token.plainToken}`;
+                await this.copyTokenLink(shareUrl);
+            } else {
+                this.showToast('Unable to retrieve full link', 'error');
+            }
         } catch (error) {
             console.error('Error copying link:', error);
+            this.showToast('Failed to copy link', 'error');
         }
     }
 
@@ -382,7 +392,49 @@ class UploadTokensManager {
     }
 
     async showQrCode(tokenId) {
-        this.showToast('⚠️ QR codes can only be generated when link is first created', 'warning');
+        try {
+            // Fetch the token with decrypted plain token
+            const options = this.addCsrfToken({ credentials: 'include' });
+            const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
+            const data = await response.json();
+            
+            if (response.ok && data.success && data.token.plainToken) {
+                this.updateCsrfToken(data);
+                const shareUrl = `${window.location.origin}/guest-upload?token=${data.token.plainToken}`;
+                
+                // Generate QR code
+                const canvas = document.getElementById('qrCanvas');
+                await new Promise((resolve, reject) => {
+                    QRCode.toCanvas(canvas, shareUrl, {
+                        width: 300,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, (error) => {
+                        if (error) {
+                            console.error('QR code generation error:', error);
+                            reject(error);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+                
+                // Set the link text and token name
+                document.getElementById('qrLinkText').textContent = shareUrl;
+                document.getElementById('qrTokenName').textContent = data.token.name;
+                
+                // Show modal
+                document.getElementById('qrModal').showModal();
+            } else {
+                this.showToast('Unable to generate QR code', 'error');
+            }
+        } catch (error) {
+            console.error('Error showing QR code:', error);
+            this.showToast('Failed to generate QR code', 'error');
+        }
     }
 
     async toggleToken(tokenId, enabled) {
@@ -451,8 +503,9 @@ class UploadTokensManager {
 
     downloadQrCode() {
         const canvas = document.getElementById('qrCanvas');
+        const tokenName = document.getElementById('qrTokenName').textContent || 'upload-link';
         const link = document.createElement('a');
-        link.download = 'upload-qr-code.png';
+        link.download = `${tokenName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-qr-code.png`;
         link.href = canvas.toDataURL();
         link.click();
     }

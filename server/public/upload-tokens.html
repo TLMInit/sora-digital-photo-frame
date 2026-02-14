@@ -202,8 +202,8 @@
 
                         <div class="grid gap-2">
                             <label for="expiresInDays" class="label">Expires In (Days)</label>
-                            <input type="number" name="expiresInDays" class="input" placeholder="30" min="1" max="365" value="30" id="expiresInDays">
-                            <p class="text-sm text-muted-foreground">How long should this link be valid?</p>
+                            <input type="number" name="expiresInDays" class="input" placeholder="30" min="0" max="365" value="30" id="expiresInDays">
+                            <p class="text-sm text-muted-foreground">Set to 0 for links that never expire</p>
                         </div>
 
                         <div class="grid gap-2">
@@ -265,7 +265,7 @@
         <dialog id="qrModal" class="dialog" aria-labelledby="qr-title">
             <article>
                 <header>
-                    <h2 id="qr-title">QR Code</h2>
+                    <h2 id="qr-title">QR Code - <span id="qrTokenName"></span></h2>
                     <button id="closeQrModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -275,7 +275,10 @@
                         <canvas id="qrCanvas"></canvas>
                     </div>
                     <div class="text-center mt-4">
-                        <p class="text-sm text-muted-foreground">Scan this QR code to access the upload page</p>
+                        <p class="text-sm text-muted-foreground mb-2">Scan this QR code to access the upload page</p>
+                        <div class="card bg-muted p-2 text-left">
+                            <p id="qrLinkText" class="text-xs break-all font-mono"></p>
+                        </div>
                     </div>
                 </section>
                 <footer>

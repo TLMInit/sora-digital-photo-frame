@@ -7,7 +7,42 @@ class UploadTokenController {
     constructor() {
         this.dataPath = path.join(__dirname, '../data');
         this.tokensFile = path.join(this.dataPath, 'upload-tokens.json');
+        // Use SESSION_SECRET for encryption key, or generate a persistent one
+        this.encryptionKey = this.getEncryptionKey();
         this.initializeDataDirectory();
+    }
+
+    getEncryptionKey() {
+        // Use SESSION_SECRET if available, otherwise use a persistent key
+        const secret = process.env.SESSION_SECRET || 'default_encryption_key_change_in_production';
+        // Create a 32-byte key from the secret
+        return crypto.scryptSync(secret, 'salt', 32);
+    }
+
+    encryptToken(plainToken) {
+        // Encrypt token for storage (allows re-display)
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', this.encryptionKey, iv);
+        let encrypted = cipher.update(plainToken, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        return {
+            encrypted: encrypted,
+            iv: iv.toString('hex')
+        };
+    }
+
+    decryptToken(encryptedData) {
+        // Decrypt token for display
+        try {
+            const iv = Buffer.from(encryptedData.iv, 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+            let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        } catch (error) {
+            console.error('Decryption error:', error);
+            return null;
+        }
     }
 
     async initializeDataDirectory() {
@@ -65,12 +100,14 @@ class UploadTokenController {
             const tokenId = this.generateTokenId();
             const plainToken = this.generateSecureToken();
             const tokenHash = await this.hashToken(plainToken);
+            const encryptedToken = this.encryptToken(plainToken);
 
             const tokens = await this.loadTokens();
 
             const newToken = {
                 id: tokenId,
                 tokenHash: tokenHash,
+                encryptedToken: encryptedToken, // Store encrypted version for later display
                 name: name || 'Unnamed Token',
                 createdAt: Date.now(),
                 // If expiresAt is null, token never expires. Otherwise use provided value or default to 30 days
@@ -105,9 +142,9 @@ class UploadTokenController {
         try {
             const tokens = await this.loadTokens();
             
-            // Don't include token hashes in response
+            // Don't include token hashes or encrypted tokens in response
             const sanitizedTokens = tokens.map(token => {
-                const { tokenHash, ...rest } = token;
+                const { tokenHash, encryptedToken, ...rest } = token;
                 return rest;
             });
 
@@ -138,8 +175,13 @@ class UploadTokenController {
                 });
             }
 
-            // Don't include token hash
-            const { tokenHash, ...sanitizedToken } = token;
+            // Don't include token hash but include decrypted token
+            const { tokenHash, encryptedToken, ...sanitizedToken } = token;
+            
+            // Decrypt the token for display
+            if (encryptedToken) {
+                sanitizedToken.plainToken = this.decryptToken(encryptedToken);
+            }
 
             res.json({
                 success: true,
