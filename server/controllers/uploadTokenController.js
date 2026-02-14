@@ -165,22 +165,45 @@ class UploadTokenController {
     async getToken(req, res) {
         try {
             const { id } = req.params;
+            console.log('[DEBUG] getToken called for id:', id);
             const tokens = await this.loadTokens();
+            console.log('[DEBUG] Loaded tokens count:', tokens.length);
             const token = tokens.find(t => t.id === id);
 
             if (!token) {
+                console.log('[DEBUG] Token not found:', id);
                 return res.status(404).json({
                     success: false,
                     error: 'Token not found'
                 });
             }
 
+            console.log('[DEBUG] Token found, has encryptedToken:', !!token.encryptedToken);
+
             // Don't include token hash but include decrypted token
             const { tokenHash, encryptedToken, ...sanitizedToken } = token;
             
             // Decrypt the token for display
             if (encryptedToken) {
-                sanitizedToken.plainToken = this.decryptToken(encryptedToken);
+                try {
+                    sanitizedToken.plainToken = this.decryptToken(encryptedToken);
+                    console.log('[DEBUG] Token decrypted successfully, length:', sanitizedToken.plainToken?.length);
+                } catch (decryptError) {
+                    console.error('[ERROR] Failed to decrypt token:', decryptError);
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Failed to decrypt token'
+                    });
+                }
+            } else {
+                console.log('[WARN] No encrypted token found for id:', id);
+                // Old tokens created before encryption was added
+                // Return success but without plainToken so frontend shows appropriate message
+                return res.json({
+                    success: true,
+                    token: sanitizedToken,
+                    warning: 'Token created before encryption. Please delete and recreate to enable QR code generation.'
+                });
             }
 
             res.json({

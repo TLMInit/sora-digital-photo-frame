@@ -423,14 +423,25 @@ class UploadTokensManager {
                 return;
             }
             
+            console.log('[DEBUG] Fetching token details for:', tokenId);
             // Fetch the token with decrypted plain token
             const options = this.addCsrfToken({ credentials: 'include' });
             const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
+            console.log('[DEBUG] Response status:', response.status, response.statusText);
             const data = await response.json();
+            console.log('[DEBUG] Response data:', data);
             
-            if (response.ok && data.success && data.token.plainToken) {
+            if (response.ok && data.success) {
+                // Check if token has warning (old token without encryption)
+                if (data.warning || !data.token.plainToken) {
+                    const message = data.warning || 'This token was created before encryption was added. Please delete and recreate it to enable QR code generation.';
+                    this.showToast(message, 'warning');
+                    return;
+                }
+                
                 this.updateCsrfToken(data);
                 const shareUrl = `${window.location.origin}/guest-upload?token=${data.token.plainToken}`;
+                console.log('[DEBUG] Generating QR code for URL:', shareUrl);
                 
                 // Generate QR code
                 const canvas = document.getElementById('qrCanvas');
@@ -449,6 +460,7 @@ class UploadTokensManager {
                                 console.error('QR code generation error:', error);
                                 reject(error);
                             } else {
+                                console.log('[DEBUG] QR code generated successfully');
                                 resolve();
                             }
                         });
@@ -466,6 +478,7 @@ class UploadTokensManager {
                 // Show modal
                 document.getElementById('qrModal').showModal();
             } else {
+                console.error('[ERROR] Invalid response:', { ok: response.ok, success: data.success, hasPlainToken: !!data.token?.plainToken });
                 this.showToast('Unable to generate QR code', 'error');
             }
         } catch (error) {
