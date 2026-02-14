@@ -106,6 +106,11 @@ class PhotoFrameAdmin {
         // Navigation
         document.getElementById('backBtn').addEventListener('click', () => this.navigateBack());
         
+        // Upload Tokens
+        document.getElementById('uploadTokensBtn').addEventListener('click', () => {
+            window.location.href = '/upload-tokens';
+        });
+
         // Access Accounts
         document.getElementById('accessAccountsBtn').addEventListener('click', () => {
             window.location.href = '/access-accounts';
