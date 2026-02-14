@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const imageController = require('./imageController');
+const { isPathSafe } = require('../utils/pathValidator');
 
 class FolderController {
   constructor() {
@@ -282,6 +283,9 @@ class FolderController {
   async getFolderContents(req, res) {
     try {
       const folderPath = req.query.path || 'uploads';
+      if (!isPathSafe(folderPath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
       const fullPath = path.join(__dirname, '..', folderPath);
       
       if (!await fs.pathExists(fullPath)) {
@@ -324,7 +328,11 @@ class FolderController {
   async createFolder(req, res) {
     try {
       const { name, path: parentPath } = req.body;
-      const fullPath = path.join(__dirname, '..', parentPath || 'uploads', name);
+      const combinedPath = path.join(parentPath || 'uploads', name);
+      if (!isPathSafe(combinedPath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
+      const fullPath = path.join(__dirname, '..', combinedPath);
       
       if (await fs.pathExists(fullPath)) {
         return res.status(400).json({ message: 'Folder already exists' });
@@ -342,6 +350,9 @@ class FolderController {
   async deleteFolder(req, res) {
     try {
       const folderPath = req.query.path;
+      if (!folderPath || !isPathSafe(folderPath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
       const fullPath = path.join(__dirname, '..', folderPath);
       
       if (!await fs.pathExists(fullPath)) {

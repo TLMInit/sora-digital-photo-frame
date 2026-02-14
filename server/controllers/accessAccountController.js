@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 class AccessAccountController {
     constructor() {
@@ -137,34 +138,32 @@ class AccessAccountController {
                 });
             }
 
-            const accounts = await this.loadAccounts();
-            
-            // Check for duplicate PIN
-            const existingAccount = accounts.find(account => account.pin === pin);
-            if (existingAccount) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'PIN already exists',
-                    code: 'DUPLICATE_PIN'
-                });
-            }
+            const hashedPin = await bcrypt.hash(pin, 10);
 
             const newAccount = {
                 id: this.generateAccountId(),
                 name,
-                pin,
+                pin: hashedPin,
                 assignedFolders,
                 uploadAccess: !!uploadAccess,
                 createdAt: new Date().toISOString(),
                 lastAccessed: null
             };
 
+            const accounts = await this.loadAccounts();
             accounts.push(newAccount);
             await this.saveAccounts(accounts);
 
             res.status(201).json({
                 success: true,
-                account: newAccount
+                account: {
+                    id: newAccount.id,
+                    name: newAccount.name,
+                    assignedFolders: newAccount.assignedFolders,
+                    uploadAccess: newAccount.uploadAccess,
+                    createdAt: newAccount.createdAt,
+                    lastAccessed: newAccount.lastAccessed
+                }
             });
         } catch (error) {
             console.error('Error creating account:', error);
@@ -198,20 +197,12 @@ class AccessAccountController {
                 });
             }
 
-            // Check for duplicate PIN (excluding current account)
-            const existingAccount = accounts.find(account => account.pin === pin && account.id !== id);
-            if (existingAccount) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'PIN already exists',
-                    code: 'DUPLICATE_PIN'
-                });
-            }
+            const hashedPin = await bcrypt.hash(pin, 10);
 
             accounts[accountIndex] = {
                 ...accounts[accountIndex],
                 name,
-                pin,
+                pin: hashedPin,
                 assignedFolders,
                 uploadAccess: uploadAccess !== undefined ? !!uploadAccess : !!accounts[accountIndex].uploadAccess
             };
@@ -220,7 +211,14 @@ class AccessAccountController {
 
             res.json({
                 success: true,
-                account: accounts[accountIndex]
+                account: {
+                    id: accounts[accountIndex].id,
+                    name: accounts[accountIndex].name,
+                    assignedFolders: accounts[accountIndex].assignedFolders,
+                    uploadAccess: accounts[accountIndex].uploadAccess,
+                    createdAt: accounts[accountIndex].createdAt,
+                    lastAccessed: accounts[accountIndex].lastAccessed
+                }
             });
         } catch (error) {
             console.error('Error updating account:', error);
@@ -269,7 +267,7 @@ class AccessAccountController {
             // Check rate limiting
             const rateLimitCheck = this.checkRateLimit(clientIP);
             if (!rateLimitCheck.allowed) {
-                console.log(`🚫 Rate limit exceeded for IP: ${clientIP}`);
+                console.log(`🚫 Rate limit exceeded for IP`);
                 return res.status(429).json({
                     success: false,
                     error: rateLimitCheck.message,
@@ -286,14 +284,35 @@ class AccessAccountController {
             }
 
             const accounts = await this.loadAccounts();
-            const account = accounts.find(acc => acc.pin === pin);
+
+            // Find account by comparing PIN with bcrypt (supports both hashed and legacy plaintext)
+            let account = null;
+            for (const acc of accounts) {
+                // Check if PIN is bcrypt-hashed
+                if (acc.pin && acc.pin.startsWith('$2')) {
+                    if (await bcrypt.compare(pin, acc.pin)) {
+                        account = acc;
+                        break;
+                    }
+                } else {
+                    // Legacy plaintext PIN — migrate on successful match
+                    if (acc.pin === pin) {
+                        acc.pin = await bcrypt.hash(pin, 10);
+                        await this.saveAccounts(accounts);
+                        account = acc;
+                        break;
+                    }
+                }
+            }
 
             if (!account) {
                 // Record failed attempt
                 this.recordFailedAttempt(clientIP);
                 const newRateLimitCheck = this.checkRateLimit(clientIP);
                 
-                console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`❌ Failed PIN attempt, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
+                }
                 
                 return res.status(401).json({
                     success: false,
@@ -305,7 +324,6 @@ class AccessAccountController {
 
             // Record successful attempt (clears rate limiting)
             this.recordSuccessfulAttempt(clientIP);
-            console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time
             account.lastAccessed = new Date().toISOString();
@@ -326,8 +344,7 @@ class AccessAccountController {
                     name: account.name,
                     assignedFolders: account.assignedFolders,
                     uploadAccess: !!account.uploadAccess
-                },
-                sessionId: req.sessionID
+                }
             });
         } catch (error) {
             console.error('Error authenticating with PIN:', error);

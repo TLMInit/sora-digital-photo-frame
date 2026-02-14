@@ -3,22 +3,12 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 const uploadMetadataController = require('./uploadMetadataController');
 const imageController = require('./imageController');
+const { isPathSafe } = require('../utils/pathValidator');
 
 class GuestUploadController {
     constructor() {
         this.uploadsDir = path.join(__dirname, '..', 'uploads');
         this.serverRoot = path.join(__dirname, '..');
-        this.resolvedServerRoot = path.resolve(this.serverRoot);
-    }
-
-    // Validate that a path stays within the server directory
-    isPathSafe(targetPath) {
-        if (!targetPath || targetPath.includes('\0')) {
-            return false;
-        }
-        const normalized = path.normalize(targetPath);
-        const resolved = path.resolve(path.join(this.serverRoot, normalized));
-        return resolved.startsWith(this.resolvedServerRoot);
     }
 
     // Get folder contents for token-based uploads - shows target folder only
@@ -27,7 +17,7 @@ class GuestUploadController {
             const token = req.uploadToken;
             const folderPath = token.targetFolder || 'uploads';
 
-            if (!this.isPathSafe(folderPath)) {
+            if (!isPathSafe(folderPath)) {
                 return res.status(400).json({ message: 'Invalid path' });
             }
 
@@ -87,7 +77,7 @@ class GuestUploadController {
         try {
             const folderPath = req.query.path || 'uploads';
 
-            if (!this.isPathSafe(folderPath)) {
+            if (!isPathSafe(folderPath)) {
                 return res.status(400).json({ message: 'Invalid path' });
             }
 
@@ -154,7 +144,7 @@ class GuestUploadController {
             const processedFiles = [];
             const uploadedPaths = [];
 
-            if (!this.isPathSafe(targetPath)) {
+            if (!isPathSafe(targetPath)) {
                 return res.status(400).json({ message: 'Invalid path' });
             }
 
@@ -225,7 +215,7 @@ class GuestUploadController {
             const processedFiles = [];
             const uploadedPaths = [];
 
-            if (!this.isPathSafe(targetPath)) {
+            if (!isPathSafe(targetPath)) {
                 return res.status(400).json({ message: 'Invalid path' });
             }
 
@@ -283,7 +273,7 @@ class GuestUploadController {
             const imagePath = req.query.path;
             const accountId = req.session.accessAccount.id;
 
-            if (!imagePath || !this.isPathSafe(imagePath)) {
+            if (!imagePath || !isPathSafe(imagePath)) {
                 return res.status(400).json({ message: 'Invalid path' });
             }
 
@@ -323,7 +313,7 @@ class GuestUploadController {
 
             // Validate all paths and check ownership
             for (const imagePath of paths) {
-                if (!this.isPathSafe(imagePath)) {
+                if (!isPathSafe(imagePath)) {
                     return res.status(400).json({ message: 'Invalid path' });
                 }
                 const isOwned = await uploadMetadataController.isOwnedByAccount(accountId, imagePath);

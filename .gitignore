@@ -179,3 +179,4 @@ CLAUDE.md
 commands
 server/data/access-accounts.json
 server/data/upload-metadata.json
+server/data/sessions/
