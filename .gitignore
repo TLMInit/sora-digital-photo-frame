@@ -180,3 +180,7 @@ commands
 server/data/access-accounts.json
 server/data/upload-metadata.json
 server/data/sessions/
+server/uploads/family/test*.jpg
+server/uploads/vacation/test*.jpg
+server/uploads/holidays/test*.jpg
+server/data/sessions/
