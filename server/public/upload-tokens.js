@@ -577,5 +577,10 @@ class UploadTokensManager {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Debug: Check if QRCode is available
+    console.log('QRCode library status:', typeof QRCode !== 'undefined' ? 'Loaded ✓' : 'NOT LOADED ✗');
+    if (typeof QRCode !== 'undefined') {
+        console.log('QRCode object:', QRCode);
+    }
     new UploadTokensManager();
 });
