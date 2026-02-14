@@ -325,15 +325,16 @@ class AccessAccountsManager {
             
             const method = this.currentEditingAccount ? 'PUT' : 'POST';
             
-            const response = await fetch(url, {
+            const response = await fetch(url, this.addCsrfToken({
                 method,
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(accountData)
-            });
+            }));
 
             const data = await response.json();
+            this.updateCsrfToken(data);
 
             if (response.ok) {
                 this.showToast(
