@@ -30,7 +30,7 @@ app.use(helmetConfig);
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, same-origin)
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
 
     const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
@@ -38,10 +38,22 @@ app.use(cors({
       : [];
 
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+
+    // Allow same-origin requests (browser sends Origin on POST/fetch)
+    // Match origin against common local patterns for this server
+    const port = process.env.PORT || 3000;
+    const sameOriginPatterns = [
+      `http://localhost:${port}`,
+      `http://127.0.0.1:${port}`,
+      `http://[::1]:${port}`
+    ];
+    if (sameOriginPatterns.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));

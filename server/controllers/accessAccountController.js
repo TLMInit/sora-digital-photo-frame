@@ -117,7 +117,12 @@ class AccessAccountController {
     async getAllAccounts(req, res) {
         try {
             const accounts = await this.loadAccounts();
-            res.json({ accounts });
+            // Strip PIN hashes from response — PINs should not be exposed
+            const safeAccounts = accounts.map(acc => ({
+                ...acc,
+                pin: '••••'
+            }));
+            res.json({ accounts: safeAccounts });
         } catch (error) {
             console.error('Error fetching accounts:', error);
             res.status(500).json({
@@ -197,12 +202,15 @@ class AccessAccountController {
                 });
             }
 
-            const hashedPin = await bcrypt.hash(pin, 10);
+            // If PIN is the masked placeholder, keep the existing hash
+            const pinToStore = (pin === '••••')
+                ? accounts[accountIndex].pin
+                : await bcrypt.hash(pin, 10);
 
             accounts[accountIndex] = {
                 ...accounts[accountIndex],
                 name,
-                pin: hashedPin,
+                pin: pinToStore,
                 assignedFolders,
                 uploadAccess: uploadAccess !== undefined ? !!uploadAccess : !!accounts[accountIndex].uploadAccess
             };

@@ -11,8 +11,9 @@ function generateToken() {
 const csrfProtection = (req, res, next) => {
   // For GET/HEAD/OPTIONS, generate and set the token
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-    if (!req.cookies || !req.cookies['_csrf']) {
-      const token = generateToken();
+    let token = req.cookies && req.cookies['_csrf'];
+    if (!token) {
+      token = generateToken();
       res.cookie('_csrf', token, {
         httpOnly: true,
         sameSite: 'lax',
@@ -20,21 +21,8 @@ const csrfProtection = (req, res, next) => {
         maxAge: 24 * 60 * 60 * 1000
       });
     }
-    // Attach csrfToken function to request
-    req.csrfToken = () => {
-      const cookieToken = req.cookies && req.cookies['_csrf'];
-      if (!cookieToken) {
-        const newToken = generateToken();
-        res.cookie('_csrf', newToken, {
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
-          maxAge: 24 * 60 * 60 * 1000
-        });
-        return newToken;
-      }
-      return cookieToken;
-    };
+    // Attach csrfToken function to request — always returns the same token
+    req.csrfToken = () => token;
     return next();
   }
 
