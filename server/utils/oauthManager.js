@@ -6,18 +6,21 @@ const { google } = require('googleapis');
 
 class OAuthManager {
   constructor() {
-    console.log('🔧 [DEBUG] OAuthManager constructor started');
-    console.log('🔧 [DEBUG] Environment variables check:');
-    console.log('🔧 [DEBUG] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'MISSING');
-    console.log('🔧 [DEBUG] GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING');
-    console.log('🔧 [DEBUG] GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI ? 'SET' : 'MISSING');
-    console.log('🔧 [DEBUG] SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'MISSING');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] OAuthManager constructor started');
+      console.log('🔧 [DEBUG] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'MISSING');
+      console.log('🔧 [DEBUG] GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING');
+      console.log('🔧 [DEBUG] GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI ? 'SET' : 'MISSING');
+      console.log('🔧 [DEBUG] SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'MISSING');
+    }
     
     this.algorithm = 'aes-256-gcm';
     
     try {
       this.secretKey = this.getEncryptionKey();
-      console.log('🔧 [DEBUG] Encryption key generated successfully');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Encryption key generated successfully');
+      }
     } catch (error) {
       console.error('❌ [DEBUG] Failed to generate encryption key:', error.message);
       throw error;
@@ -29,7 +32,9 @@ class OAuthManager {
         process.env.GOOGLE_CLIENT_SECRET,
         process.env.GOOGLE_REDIRECT_URI
       );
-      console.log('🔧 [DEBUG] OAuth2 client created successfully');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] OAuth2 client created successfully');
+      }
     } catch (error) {
       console.error('❌ [DEBUG] Failed to create OAuth2 client:', error.message);
       throw error;
@@ -43,7 +48,8 @@ class OAuthManager {
     }
 
     // Create a 32-byte key from the session secret
-    return crypto.scryptSync(sessionSecret, 'google-photos-salt', 32);
+    const salt = process.env.OAUTH_ENCRYPTION_SALT || 'google-photos-salt';
+    return crypto.scryptSync(sessionSecret, salt, 32);
   }
 
   encrypt(text) {
@@ -133,7 +139,9 @@ class OAuthManager {
 
   // OAuth flow methods
   getAuthUrl(redirectUri) {
-    console.log('🔧 [DEBUG] getAuthUrl called with redirectUri:', redirectUri);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] getAuthUrl called with redirectUri:', redirectUri);
+    }
     
     const scopes = [
       'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
@@ -141,7 +149,9 @@ class OAuthManager {
       'https://www.googleapis.com/auth/userinfo.email'
     ];
     
-    console.log('🔧 [DEBUG] OAuth scopes:', scopes);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] OAuth scopes:', scopes);
+    }
 
     try {
       const authUrl = this.oauth2Client.generateAuthUrl({
@@ -149,7 +159,9 @@ class OAuthManager {
         scope: scopes,
         include_granted_scopes: true
       });
-      console.log('🔧 [DEBUG] Generated auth URL:', authUrl);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Generated auth URL:', authUrl);
+      }
       return authUrl;
     } catch (error) {
       console.error('❌ [DEBUG] Failed to generate auth URL:', error.message);
@@ -158,32 +170,40 @@ class OAuthManager {
   }
 
   async exchangeCodeForTokens(code) {
-    console.log('🔧 [DEBUG] exchangeCodeForTokens called with code:', code ? 'PROVIDED' : 'MISSING');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] exchangeCodeForTokens called with code:', code ? 'PROVIDED' : 'MISSING');
+    }
     
     try {
       const { tokens } = await this.oauth2Client.getToken(code);
-      console.log('🔧 [DEBUG] Token exchange successful. Tokens received:', {
-        access_token: tokens.access_token ? 'SET' : 'MISSING',
-        refresh_token: tokens.refresh_token ? 'SET' : 'MISSING',
-        expiry_date: tokens.expiry_date || 'NOT_SET'
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Token exchange successful. Tokens received:', {
+          access_token: tokens.access_token ? 'SET' : 'MISSING',
+          refresh_token: tokens.refresh_token ? 'SET' : 'MISSING',
+          expiry_date: tokens.expiry_date || 'NOT_SET'
+        });
+      }
       
       // Fetch user profile information
       try {
         this.oauth2Client.setCredentials(tokens);
         const oauth2 = google.oauth2({ version: 'v2', auth: this.oauth2Client });
         const userInfo = await oauth2.userinfo.get();
-        console.log('🔧 [DEBUG] User profile fetched:', userInfo.data);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔧 [DEBUG] User profile fetched:', userInfo.data);
+        }
         
         // Add user info to tokens
         tokens.userEmail = userInfo.data.email;
         tokens.userName = userInfo.data.name;
         tokens.userPicture = userInfo.data.picture;
         
-        console.log('🔧 [DEBUG] Enhanced tokens with user info:', {
-          email: tokens.userEmail,
-          name: tokens.userName
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔧 [DEBUG] Enhanced tokens with user info:', {
+            email: tokens.userEmail,
+            name: tokens.userName
+          });
+        }
       } catch (profileError) {
         console.error('❌ [DEBUG] Failed to fetch user profile:', profileError.message);
         // Continue without user info
@@ -210,25 +230,33 @@ class OAuthManager {
   // Create Google Photos Picker session
   async createPickerSession(accessToken, destinationPath) {
     try {
-      console.log('🔧 [DEBUG] Creating Google Photos picker session for path:', destinationPath);
-      console.log('🔧 [DEBUG] Access token present:', !!accessToken);
-      console.log('🔧 [DEBUG] Access token length:', accessToken ? accessToken.length : 0);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Creating Google Photos picker session for path:', destinationPath);
+        console.log('🔧 [DEBUG] Access token present:', !!accessToken);
+        console.log('🔧 [DEBUG] Access token length:', accessToken ? accessToken.length : 0);
+      }
       
       // First, let's validate the access token by checking if it has the right scope
       try {
         const tokenInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`);
         const tokenInfo = await tokenInfoResponse.json();
-        console.log('🔧 [DEBUG] Token info:', tokenInfo);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔧 [DEBUG] Token info:', tokenInfo);
+        }
       } catch (tokenError) {
         console.warn('⚠️ [DEBUG] Could not validate token:', tokenError.message);
       }
       
       // Generate a unique request ID (UUID v4 format)
       const requestId = crypto.randomUUID();
-      console.log('🔧 [DEBUG] Generated request ID:', requestId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Generated request ID:', requestId);
+      }
       
       const requestUrl = `https://photospicker.googleapis.com/v1/sessions?requestId=${requestId}`;
-      console.log('🔧 [DEBUG] Request URL:', requestUrl);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Request URL:', requestUrl);
+      }
       
       const response = await fetch(requestUrl, {
         method: 'POST',
@@ -263,11 +291,13 @@ class OAuthManager {
       }
 
       const sessionData = await response.json();
-      console.log('🔧 [DEBUG] Picker session created successfully:', sessionData);
-      console.log('🔧 [DEBUG] Session data keys:', Object.keys(sessionData));
-      console.log('🔧 [DEBUG] Session ID:', sessionData.id);
-      console.log('🔧 [DEBUG] Picker URI:', sessionData.pickerUri);
-      console.log('🔧 [DEBUG] Polling config:', sessionData.pollingConfig);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Picker session created successfully:', sessionData);
+        console.log('🔧 [DEBUG] Session data keys:', Object.keys(sessionData));
+        console.log('🔧 [DEBUG] Session ID:', sessionData.id);
+        console.log('🔧 [DEBUG] Picker URI:', sessionData.pickerUri);
+        console.log('🔧 [DEBUG] Polling config:', sessionData.pollingConfig);
+      }
       
       if (!sessionData.pickerUri) {
         console.error('❌ [DEBUG] No pickerUri in response:', sessionData);
@@ -283,7 +313,9 @@ class OAuthManager {
         pollingConfig: parsedPollingConfig
       };
       
-      console.log('🔧 [DEBUG] Returning session data:', result);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Returning session data:', result);
+      }
       return result;
     } catch (error) {
       console.error('❌ [DEBUG] Error creating picker session:', error);
@@ -293,7 +325,9 @@ class OAuthManager {
 
   // Parse Google's duration strings (e.g., "5s", "300.5s") to milliseconds
   parsePollingConfig(pollingConfig) {
-    console.log('🔧 [DEBUG] Parsing polling config:', pollingConfig);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] Parsing polling config:', pollingConfig);
+    }
     
     if (!pollingConfig) {
       return {
@@ -320,7 +354,9 @@ class OAuthManager {
     const timeoutIn = parseDuration(pollingConfig.timeoutIn) || 300000;       // Default 5 minutes
     
     const result = { pollInterval, timeoutIn };
-    console.log('🔧 [DEBUG] Parsed polling config result:', result);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔧 [DEBUG] Parsed polling config result:', result);
+    }
     
     return result;
   }
@@ -328,7 +364,9 @@ class OAuthManager {
   // Get Google Photos Picker session status
   async getPickerSession(accessToken, sessionId) {
     try {
-      console.log('🔧 [DEBUG] Getting Google Photos picker session:', sessionId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Getting Google Photos picker session:', sessionId);
+      }
       
       const response = await fetch(`https://photospicker.googleapis.com/v1/sessions/${sessionId}`, {
         method: 'GET',
@@ -358,7 +396,9 @@ class OAuthManager {
       }
 
       const sessionData = await response.json();
-      console.log('🔧 [DEBUG] Picker session retrieved successfully:', sessionData);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Picker session retrieved successfully:', sessionData);
+      }
       
       return sessionData;
     } catch (error) {
@@ -370,7 +410,9 @@ class OAuthManager {
   // Get media items from Google Photos Picker session
   async getSessionMediaItems(accessToken, sessionId) {
     try {
-      console.log('🔧 [DEBUG] Getting media items for session:', sessionId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Getting media items for session:', sessionId);
+      }
       
       const response = await fetch(`https://photospicker.googleapis.com/v1/mediaItems?sessionId=${sessionId}`, {
         method: 'GET',
@@ -400,13 +442,17 @@ class OAuthManager {
       }
 
       const mediaData = await response.json();
-      console.log('🔧 [DEBUG] Media items retrieved successfully:', mediaData);
-      console.log('🔧 [DEBUG] Media data keys:', Object.keys(mediaData));
-      console.log('🔧 [DEBUG] Media items array:', mediaData.mediaItems);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔧 [DEBUG] Media items retrieved successfully:', mediaData);
+        console.log('🔧 [DEBUG] Media data keys:', Object.keys(mediaData));
+        console.log('🔧 [DEBUG] Media items array:', mediaData.mediaItems);
+      }
       
       if (mediaData.mediaItems && mediaData.mediaItems.length > 0) {
-        console.log('🔧 [DEBUG] First media item structure:', mediaData.mediaItems[0]);
-        console.log('🔧 [DEBUG] First media item keys:', Object.keys(mediaData.mediaItems[0]));
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔧 [DEBUG] First media item structure:', mediaData.mediaItems[0]);
+          console.log('🔧 [DEBUG] First media item keys:', Object.keys(mediaData.mediaItems[0]));
+        }
       }
       
       return mediaData.mediaItems || [];
