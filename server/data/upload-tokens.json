@@ -58,5 +58,21 @@
     "enabled": true,
     "targetFolder": "uploads",
     "createdBy": "test"
+  },
+  {
+    "id": "6cedb850f0def47ae9bfd9a5efb4ca23",
+    "tokenHash": "$2a$10$yTIW4M44OiUBS8F0tfyUl.n5PqNMBiQ49D6EzjaftpPEDOWOxnSAO",
+    "encryptedToken": {
+      "encrypted": "5f7f00ee3f68595a35587159796e273e60fba065693f4f5de588fcbb61ef8eb60298d5e5e543c13ae370fb8ad2dcf9bd",
+      "iv": "c8b9aea6019299c43147c2e78f5d1d7a"
+    },
+    "name": "Test QR Code Fix",
+    "createdAt": 1771083259486,
+    "expiresAt": 1771688059393,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "admin"
   }
 ]

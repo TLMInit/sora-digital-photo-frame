@@ -347,16 +347,39 @@ class UploadTokensManager {
         
         // Generate QR code
         const canvas = document.getElementById('createdTokenQR');
-        QRCode.toCanvas(canvas, shareUrl, {
-            width: 256,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
+        
+        // Check if QRCode library is available
+        if (typeof QRCode !== 'undefined') {
+            try {
+                QRCode.toCanvas(canvas, shareUrl, {
+                    width: 256,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, (error) => {
+                    if (error) {
+                        console.error('QR code generation error:', error);
+                        canvas.style.display = 'none';
+                        const fallback = document.createElement('div');
+                        fallback.className = 'alert alert-warning';
+                        fallback.textContent = 'QR code generation failed. You can still copy the link above.';
+                        canvas.parentNode.appendChild(fallback);
+                    }
+                });
+            } catch (err) {
+                console.error('QRCode error:', err);
+                canvas.style.display = 'none';
             }
-        }, (error) => {
-            if (error) console.error('QR code generation error:', error);
-        });
+        } else {
+            console.error('QRCode library not loaded');
+            canvas.style.display = 'none';
+            const fallback = document.createElement('div');
+            fallback.className = 'alert alert-warning';
+            fallback.textContent = 'QR code library not loaded. Please copy the link above to share.';
+            canvas.parentNode.appendChild(fallback);
+        }
 
         document.getElementById('tokenCreatedModal').showModal();
     }
@@ -393,6 +416,13 @@ class UploadTokensManager {
 
     async showQrCode(tokenId) {
         try {
+            // Check if QRCode library is available
+            if (typeof QRCode === 'undefined') {
+                console.error('QRCode library not loaded');
+                this.showToast('QR code library not available. Please refresh the page.', 'error');
+                return;
+            }
+            
             // Fetch the token with decrypted plain token
             const options = this.addCsrfToken({ credentials: 'include' });
             const response = await fetch(`/api/upload-tokens/${tokenId}`, options);
@@ -404,23 +434,30 @@ class UploadTokensManager {
                 
                 // Generate QR code
                 const canvas = document.getElementById('qrCanvas');
-                await new Promise((resolve, reject) => {
-                    QRCode.toCanvas(canvas, shareUrl, {
-                        width: 300,
-                        margin: 2,
-                        color: {
-                            dark: '#000000',
-                            light: '#ffffff'
-                        }
-                    }, (error) => {
-                        if (error) {
-                            console.error('QR code generation error:', error);
-                            reject(error);
-                        } else {
-                            resolve();
-                        }
+                
+                try {
+                    await new Promise((resolve, reject) => {
+                        QRCode.toCanvas(canvas, shareUrl, {
+                            width: 300,
+                            margin: 2,
+                            color: {
+                                dark: '#000000',
+                                light: '#ffffff'
+                            }
+                        }, (error) => {
+                            if (error) {
+                                console.error('QR code generation error:', error);
+                                reject(error);
+                            } else {
+                                resolve();
+                            }
+                        });
                     });
-                });
+                } catch (qrError) {
+                    console.error('QR code generation failed:', qrError);
+                    canvas.style.display = 'none';
+                    this.showToast('QR code generation failed, but you can still copy the link', 'warning');
+                }
                 
                 // Set the link text and token name
                 document.getElementById('qrLinkText').textContent = shareUrl;
