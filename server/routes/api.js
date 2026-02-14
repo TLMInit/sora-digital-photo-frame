@@ -56,12 +56,12 @@ router.delete('/auth/session', accessAccountController.clearSession.bind(accessA
 // Upload token management routes (admin only)
 router.post('/upload-tokens', requireAuth, uploadTokenController.createToken.bind(uploadTokenController));
 router.get('/upload-tokens', requireAuth, uploadTokenController.getAllTokens.bind(uploadTokenController));
-router.get('/upload-tokens/:id', requireAuth, uploadTokenController.getToken.bind(uploadTokenController));
 router.patch('/upload-tokens/:id', requireAuth, uploadTokenController.updateToken.bind(uploadTokenController));
 router.delete('/upload-tokens/:id', requireAuth, uploadTokenController.deleteToken.bind(uploadTokenController));
 
-// Public token validation and upload routes
+// Public token validation and upload routes (must come before /upload-tokens/:id to avoid route conflict)
 router.get('/upload-tokens/validate', uploadTokenController.validateToken.bind(uploadTokenController));
+router.get('/upload-tokens/:id', requireAuth, uploadTokenController.getToken.bind(uploadTokenController));
 router.post('/token/upload', requireUploadToken, upload.array('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
 router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
 

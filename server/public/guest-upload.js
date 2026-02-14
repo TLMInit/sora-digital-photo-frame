@@ -139,9 +139,6 @@ class GuestUploadManager {
         });
         this.updateThemeButton(localStorage.getItem('themeMode') || 'system');
 
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
-
         // Dialog backdrop clicks
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.addEventListener('click', (e) => {
@@ -733,24 +730,6 @@ class GuestUploadManager {
         this.updateEmptyStateUploadButton();
         this.updateEmptyStateFilesDisplay();
         document.getElementById('emptyStateUploadProgress').classList.add('hidden');
-    }
-
-    // --- Logout ---
-
-    async logout() {
-        try {
-            await fetch('/api/auth/session', {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            this.showToast('Signing out...', 'info');
-            setTimeout(() => {
-                window.location.href = '/slideshow';
-            }, 1000);
-        } catch (error) {
-            console.error('Error during logout:', error);
-            window.location.href = '/slideshow';
-        }
     }
 
     // --- Toast ---

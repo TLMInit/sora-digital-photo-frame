@@ -1,0 +1,14 @@
+[
+  {
+    "id": "92b2e3cceae27e5b1b90fd11ef551fa0",
+    "tokenHash": "$2a$10$Yf8JKDZ2qsIRD5q11GwUz.YWgH55WloY8Us/17KYy0nbp0RG.ZUiC",
+    "name": "Birthday Party 2024",
+    "createdAt": 1771076034408,
+    "expiresAt": 1773668034000,
+    "uploadLimit": 50,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "vacation",
+    "createdBy": "admin"
+  }
+]
