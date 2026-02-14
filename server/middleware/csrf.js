@@ -1,15 +1,56 @@
-const csrf = require('csurf');
+const crypto = require('crypto');
+
+// Custom CSRF protection using double-submit cookie pattern
+// Replaces the deprecated csurf package
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 // CSRF protection middleware
-// Configure CSRF protection with cookie-based tokens
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+const csrfProtection = (req, res, next) => {
+  // For GET/HEAD/OPTIONS, generate and set the token
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    let token = req.cookies && req.cookies['_csrf'];
+    if (!token) {
+      token = generateToken();
+      res.cookie('_csrf', token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+    }
+    // Attach csrfToken function to request — always returns the same token
+    req.csrfToken = () => token;
+    return next();
   }
-});
+
+  // For state-changing methods, validate the token
+  const cookieToken = req.cookies && req.cookies['_csrf'];
+  const headerToken = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
+  const bodyToken = req.body && req.body._csrf;
+  const submittedToken = headerToken || bodyToken;
+
+  if (!cookieToken || !submittedToken || cookieToken.length !== submittedToken.length) {
+    const err = new Error('Invalid CSRF token');
+    err.code = 'EBADCSRFTOKEN';
+    return next(err);
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  const cookieBuf = Buffer.from(cookieToken);
+  const submittedBuf = Buffer.from(submittedToken);
+  if (!crypto.timingSafeEqual(cookieBuf, submittedBuf)) {
+    const err = new Error('Invalid CSRF token');
+    err.code = 'EBADCSRFTOKEN';
+    return next(err);
+  }
+
+  // Attach csrfToken function
+  req.csrfToken = () => cookieToken;
+  next();
+};
 
 // Middleware to attach CSRF token to response locals for templates
 const attachCsrfToken = (req, res, next) => {

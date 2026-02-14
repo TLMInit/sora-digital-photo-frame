@@ -1,13 +1,20 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
+const { isPathSafe } = require('../utils/pathValidator');
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = req.body.path || 'uploads';
-    const fullPath = path.join(__dirname, '..', uploadPath);
-    console.log('Upload destination:', uploadPath, 'Full path:', fullPath);
+    const serverRoot = path.join(__dirname, '..');
+    const fullPath = path.resolve(path.join(serverRoot, uploadPath));
+
+    // Validate path stays within server root
+    if (!isPathSafe(uploadPath)) {
+      return cb(new Error('Invalid upload path'));
+    }
+
     fs.ensureDirSync(fullPath);
     cb(null, fullPath);
   },

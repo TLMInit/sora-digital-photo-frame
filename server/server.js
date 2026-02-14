@@ -6,6 +6,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs-extra');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const cookieParser = require('cookie-parser');
 
 // Import middleware
@@ -28,7 +29,32 @@ app.use(helmetConfig);
 
 // Middleware
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : true,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+      ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
+      : [];
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow same-origin requests (browser sends Origin on POST/fetch)
+    // Match origin against common local patterns for this server
+    const port = process.env.PORT || 3000;
+    const sameOriginPatterns = [
+      `http://localhost:${port}`,
+      `http://127.0.0.1:${port}`,
+      `http://[::1]:${port}`
+    ];
+    if (sameOriginPatterns.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -42,16 +68,28 @@ if (!sessionSecret) {
   process.exit(1);
 }
 
+// Require ADMIN_PASSWORD — no default fallback
+const adminPassword = process.env.ADMIN_PASSWORD;
+if (!adminPassword) {
+  console.error('ADMIN_PASSWORD environment variable not set. Exiting for security.');
+  process.exit(1);
+}
+
 app.use(session({
+  store: new FileStore({
+    path: path.join(__dirname, 'data', 'sessions'),
+    ttl: 86400,
+    retries: 0
+  }),
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
-  name: 'photoframe.sid', // Custom session cookie name
+  name: 'photoframe.sid',
   cookie: {
-    secure: false, // Set to false for development, even in production for HTTP
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax' // Add SameSite attribute for better compatibility
+    sameSite: 'lax'
   }
 }));
 
@@ -89,8 +127,13 @@ app.use((req, res, next) => {
 app.use(attachCsrfToken);
 app.use(addCsrfTokenToResponse);
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static files - uploaded files require authentication
+app.use('/uploads', (req, res, next) => {
+  if (req.session && (req.session.authenticated || req.session.accessAccount)) {
+    return next();
+  }
+  return res.status(401).json({ message: 'Authentication required' });
+}, express.static(path.join(__dirname, 'uploads')));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
 app.use('/admin', express.static(path.join(__dirname, 'public')));
 // Serve CSS and JS files from root for access-accounts page

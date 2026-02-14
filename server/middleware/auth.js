@@ -1,14 +1,55 @@
 const bcrypt = require('bcryptjs');
 
+// In-memory rate limiter for admin login
+const loginRateLimiter = new Map();
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+const LOGIN_ATTEMPT_WINDOW = 5 * 60 * 1000; // 5 minutes
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const record = loginRateLimiter.get(ip);
+  if (!record) return { allowed: true, attemptsRemaining: LOGIN_MAX_ATTEMPTS };
+  if (record.lockoutUntil && now < record.lockoutUntil) {
+    const remainingTime = Math.ceil((record.lockoutUntil - now) / 1000 / 60);
+    return { allowed: false, message: `Too many failed attempts. Try again in ${remainingTime} minutes.` };
+  }
+  if (record.firstAttempt && (now - record.firstAttempt) > LOGIN_ATTEMPT_WINDOW) {
+    loginRateLimiter.delete(ip);
+    return { allowed: true, attemptsRemaining: LOGIN_MAX_ATTEMPTS };
+  }
+  if (record.attempts >= LOGIN_MAX_ATTEMPTS) {
+    record.lockoutUntil = now + LOGIN_LOCKOUT_DURATION;
+    const remainingTime = Math.ceil(LOGIN_LOCKOUT_DURATION / 1000 / 60);
+    return { allowed: false, message: `Too many failed attempts. Account locked for ${remainingTime} minutes.` };
+  }
+  return { allowed: true, attemptsRemaining: LOGIN_MAX_ATTEMPTS - record.attempts };
+}
+
+function recordLoginFailedAttempt(ip) {
+  const now = Date.now();
+  const record = loginRateLimiter.get(ip);
+  if (!record) {
+    loginRateLimiter.set(ip, { attempts: 1, firstAttempt: now, lockoutUntil: null });
+  } else {
+    record.attempts += 1;
+    if (!record.firstAttempt) record.firstAttempt = now;
+  }
+}
+
+function clearLoginRateLimit(ip) {
+  loginRateLimiter.delete(ip);
+}
+
 // Check if user is authenticated
 const requireAuth = (req, res, next) => {
-  console.log('🔐 Auth Check:', {
-    sessionId: req.sessionID,
-    hasSession: !!req.session,
-    authenticated: req.session?.authenticated,
-    path: req.path,
-    cookies: req.headers.cookie ? 'present' : 'missing'
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('🔐 Auth Check:', {
+      hasSession: !!req.session,
+      authenticated: req.session?.authenticated,
+      path: req.path
+    });
+  }
 
   if (req.session && req.session.authenticated) {
     // Check if session has expired based on login time and maxAge
@@ -40,7 +81,9 @@ const requireAuth = (req, res, next) => {
     return next();
   }
 
-  console.log('❌ Authentication failed for:', req.path);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('❌ Authentication failed for:', req.path);
+  }
 
   // Check both req.path and req.originalUrl for API requests
   const isApiRequest = req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
@@ -69,28 +112,25 @@ const requireGuest = (req, res, next) => {
 // Login handler
 const login = async (req, res) => {
   const { password } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
 
-  console.log('🔐 Login attempt:', {
-    hasPassword: !!password,
-    passwordLength: password ? password.length : 0,
-    contentType: req.headers['content-type']
-  });
+  // Check rate limit before processing
+  const rateCheck = checkLoginRateLimit(clientIP);
+  if (!rateCheck.allowed) {
+    return res.status(429).json({
+      message: rateCheck.message,
+      code: 'RATE_LIMITED'
+    });
+  }
 
   if (!password) {
     return res.status(400).json({ message: 'Password is required' });
   }
 
-  // Secure password comparison using bcrypt
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-  console.log('🔑 Admin password check:', {
-    hasEnvPassword: !!process.env.ADMIN_PASSWORD,
-    isBcryptHash: adminPassword.startsWith('$2'),
-    adminPasswordPrefix: adminPassword.substring(0, 10)
-  });
-
-  if (!process.env.ADMIN_PASSWORD) {
-    console.warn('⚠️  ADMIN_PASSWORD environment variable not set. Using default password "admin123". Please set ADMIN_PASSWORD environment variable for security!');
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    console.error('ADMIN_PASSWORD environment variable not set');
+    return res.status(500).json({ message: 'Server configuration error' });
   }
 
   // For bcrypt hashed passwords, use bcrypt.compare()
@@ -98,26 +138,19 @@ const login = async (req, res) => {
   let isValidPassword = false;
   
   if (adminPassword.startsWith('$2')) {
-    // Bcrypt hash detected
-    console.log('🔐 Using bcrypt comparison');
     isValidPassword = await bcrypt.compare(password, adminPassword);
   } else {
-    // Plain text password (not recommended for production)
-    console.log('⚠️  Using plain text comparison');
     isValidPassword = password === adminPassword;
   }
 
-  console.log('🔓 Password validation result:', { isValidPassword });
-
   if (isValidPassword) {
+    clearLoginRateLimit(clientIP);
     req.session.authenticated = true;
     req.session.loginTime = new Date();
 
-    console.log('✅ Login successful:', {
-      sessionId: req.sessionID,
-      authenticated: req.session.authenticated,
-      loginTime: req.session.loginTime
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('✅ Login successful');
+    }
 
     // If it's an API request, return JSON success
     if (req.headers['content-type'] === 'application/json') {
@@ -129,6 +162,7 @@ const login = async (req, res) => {
   }
 
   // Invalid password
+  recordLoginFailedAttempt(clientIP);
   console.log('❌ Login failed: Invalid password');
   
   if (req.headers['content-type'] === 'application/json') {

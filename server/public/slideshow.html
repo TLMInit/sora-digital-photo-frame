@@ -745,17 +745,23 @@
             }
 
             async nextImage() {
-                this.resetProgress();
-                const imageData = await this.fetchRandomImage();
-                if (imageData) {
-                    const loaded = await this.loadImage(imageData);
-                    if (loaded) {
-                        this.showImage();
+                if (this._transitioning) return;
+                this._transitioning = true;
+                try {
+                    this.resetProgress();
+                    const imageData = await this.fetchRandomImage();
+                    if (imageData) {
+                        const loaded = await this.loadImage(imageData);
+                        if (loaded) {
+                            this.showImage();
+                        }
                     }
-                }
 
-                if (this.isPlaying) {
-                    this.scheduleNext();
+                    if (this.isPlaying) {
+                        this.scheduleNext();
+                    }
+                } finally {
+                    this._transitioning = false;
                 }
             }
 
@@ -981,6 +987,8 @@
             }
 
             async startSlideshow() {
+                if (this._slideshowStarted) return;
+                this._slideshowStarted = true;
                 this.hideError();
 
                 const imageData = await this.fetchRandomImage();
@@ -990,9 +998,11 @@
                         this.showImage();
                         this.scheduleNext();
                     } else {
+                        this._slideshowStarted = false;
                         this.showError('Failed to load first image');
                     }
                 } else {
+                    this._slideshowStarted = false;
                     this.showError('No images available');
                 }
             }

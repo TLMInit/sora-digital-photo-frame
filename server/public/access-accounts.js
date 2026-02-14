@@ -230,11 +230,13 @@ class AccessAccountsManager {
         if (account) {
             title.textContent = 'Edit Access Account';
             document.getElementById('accountName').value = account.name;
-            document.getElementById('accountPin').value = account.pin;
+            document.getElementById('accountPin').value = '';
+            document.getElementById('accountPin').placeholder = 'Leave blank to keep current PIN';
             document.getElementById('uploadAccess').checked = !!account.uploadAccess;
         } else {
             title.textContent = 'Create Access Account';
             form.reset();
+            document.getElementById('accountPin').placeholder = 'Enter PIN';
             document.getElementById('uploadAccess').checked = false;
         }
 
@@ -311,6 +313,11 @@ class AccessAccountsManager {
             uploadAccess: document.getElementById('uploadAccess').checked
         };
 
+        // When editing, if PIN field is empty, keep existing PIN
+        if (this.currentEditingAccount && !accountData.pin) {
+            accountData.keepPin = true;
+        }
+
         try {
             const url = this.currentEditingAccount 
                 ? `/api/access-accounts/${this.currentEditingAccount.id}`
@@ -318,15 +325,16 @@ class AccessAccountsManager {
             
             const method = this.currentEditingAccount ? 'PUT' : 'POST';
             
-            const response = await fetch(url, {
+            const response = await fetch(url, this.addCsrfToken({
                 method,
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(accountData)
-            });
+            }));
 
             const data = await response.json();
+            this.updateCsrfToken(data);
 
             if (response.ok) {
                 this.showToast(
@@ -404,8 +412,11 @@ class AccessAccountsManager {
             isValid = false;
         }
 
-        if (!this.validatePin(pin)) {
-            isValid = false;
+        // PIN is required only when creating a new account
+        if (!this.currentEditingAccount || pin) {
+            if (!this.validatePin(pin)) {
+                isValid = false;
+            }
         }
 
         return isValid;

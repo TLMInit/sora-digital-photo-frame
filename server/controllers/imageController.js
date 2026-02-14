@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
+const { isPathSafe } = require('../utils/pathValidator');
 
 class ImageController {
   constructor() {
@@ -230,12 +231,13 @@ class ImageController {
   // Upload images
   async uploadImages(req, res) {
     try {
-      console.log('Upload request body:', req.body);
-      console.log('Upload files:', req.files?.map(f => f.path));
-      
       const uploadedFiles = req.files;
       const targetPath = req.body.path || 'uploads';
       const processedFiles = [];
+
+      if (!isPathSafe(targetPath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
       
       for (const file of uploadedFiles) {
         // If the target path is different from where multer uploaded it, move the file
@@ -287,6 +289,9 @@ class ImageController {
   async deleteImage(req, res) {
     try {
       const imagePath = req.query.path;
+      if (!imagePath || !isPathSafe(imagePath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
       const fullPath = path.join(__dirname, '..', imagePath);
       
       if (!await fs.pathExists(fullPath)) {
@@ -322,6 +327,11 @@ class ImageController {
       
       for (const imagePath of paths) {
         try {
+          if (!isPathSafe(imagePath)) {
+            results.failedCount++;
+            results.errors.push(`Invalid path: ${imagePath}`);
+            continue;
+          }
           const fullPath = path.join(__dirname, '..', imagePath);
           
           if (await fs.pathExists(fullPath)) {
@@ -362,6 +372,9 @@ class ImageController {
   async rotateImage(req, res) {
     try {
       const { path: imagePath, angle = 90 } = req.body;
+      if (!imagePath || !isPathSafe(imagePath)) {
+        return res.status(400).json({ message: 'Invalid path' });
+      }
       const fullPath = path.join(__dirname, '..', imagePath);
       
       if (!await fs.pathExists(fullPath)) {
