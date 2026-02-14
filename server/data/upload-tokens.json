@@ -10,5 +10,17 @@
     "enabled": true,
     "targetFolder": "vacation",
     "createdBy": "admin"
+  },
+  {
+    "id": "712693ede2eae8f7aac3ef39ed812adc",
+    "tokenHash": "$2a$10$sc/g3TcalD04ZfIccLHmQOSi9aDTkzqwaPdVkImZqWR.F46MB3ofe",
+    "name": "Test Event 2024",
+    "createdAt": 1771080935160,
+    "expiresAt": 1773672935063,
+    "uploadLimit": null,
+    "uploadCount": 0,
+    "enabled": true,
+    "targetFolder": "uploads",
+    "createdBy": "admin"
   }
 ]

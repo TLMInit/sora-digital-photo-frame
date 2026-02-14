@@ -53,6 +53,11 @@ class UploadTokensManager {
             this.saveToken();
         });
 
+        // Save token button (triggers form submit)
+        document.getElementById('saveTokenBtn').addEventListener('click', () => {
+            document.getElementById('tokenForm').requestSubmit();
+        });
+
         // Token created modal
         document.getElementById('closeCreatedModalBtn').addEventListener('click', () => {
             this.closeTokenCreatedModal();
