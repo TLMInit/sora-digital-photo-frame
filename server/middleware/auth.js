@@ -70,6 +70,12 @@ const requireGuest = (req, res, next) => {
 const login = async (req, res) => {
   const { password } = req.body;
 
+  console.log('🔐 Login attempt:', {
+    hasPassword: !!password,
+    passwordLength: password ? password.length : 0,
+    contentType: req.headers['content-type']
+  });
+
   if (!password) {
     return res.status(400).json({ message: 'Password is required' });
   }
@@ -77,24 +83,40 @@ const login = async (req, res) => {
   // Secure password comparison using bcrypt
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
+  console.log('🔑 Admin password check:', {
+    hasEnvPassword: !!process.env.ADMIN_PASSWORD,
+    isBcryptHash: adminPassword.startsWith('$2'),
+    adminPasswordPrefix: adminPassword.substring(0, 10)
+  });
+
   if (!process.env.ADMIN_PASSWORD) {
     console.warn('⚠️  ADMIN_PASSWORD environment variable not set. Using default password "admin123". Please set ADMIN_PASSWORD environment variable for security!');
   }
 
   // For bcrypt hashed passwords, use bcrypt.compare()
   // For plain text passwords (development only), use direct comparison
-  const isValidPassword = adminPassword.startsWith('$2')
-    ? await bcrypt.compare(password, adminPassword)
-    : password === adminPassword;
+  let isValidPassword = false;
+  
+  if (adminPassword.startsWith('$2')) {
+    // Bcrypt hash detected
+    console.log('🔐 Using bcrypt comparison');
+    isValidPassword = await bcrypt.compare(password, adminPassword);
+  } else {
+    // Plain text password (not recommended for production)
+    console.log('⚠️  Using plain text comparison');
+    isValidPassword = password === adminPassword;
+  }
+
+  console.log('🔓 Password validation result:', { isValidPassword });
 
   if (isValidPassword) {
     req.session.authenticated = true;
     req.session.loginTime = new Date();
 
-    console.log('🔓 Login successful:', {
+    console.log('✅ Login successful:', {
       sessionId: req.sessionID,
-      sessionData: req.session,
-      cookies: req.headers.cookie ? 'present' : 'missing'
+      authenticated: req.session.authenticated,
+      loginTime: req.session.loginTime
     });
 
     // If it's an API request, return JSON success
@@ -107,6 +129,8 @@ const login = async (req, res) => {
   }
 
   // Invalid password
+  console.log('❌ Login failed: Invalid password');
+  
   if (req.headers['content-type'] === 'application/json') {
     return res.status(401).json({ message: 'Invalid password' });
   }

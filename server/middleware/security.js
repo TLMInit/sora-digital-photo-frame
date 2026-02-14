@@ -17,7 +17,7 @@ const tokenValidationLimiter = rateLimit({
 });
 
 // Rate limiter for token upload endpoint
-// Allow 10 upload requests per IP per hour per token
+// Allow 10 upload requests per IP per hour
 const tokenUploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // 10 uploads per window
@@ -27,11 +27,7 @@ const tokenUploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Use token from query as additional key to rate limit per token per IP
-  keyGenerator: (req) => {
-    const token = req.query.token || req.body.token || '';
-    return `${req.ip}-${token.substring(0, 10)}`; // IP + first 10 chars of token
-  },
+  // Note: Rate limiting per IP only. Token validation handles per-token limits.
   skip: (req) => process.env.NODE_ENV === 'development' && (req.ip === '::1' || req.ip === '127.0.0.1')
 });
 

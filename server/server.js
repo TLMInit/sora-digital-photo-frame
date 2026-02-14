@@ -60,7 +60,7 @@ app.use(logger);
 // CSRF protection (after cookie parser and before routes)
 // Apply CSRF protection to all routes except public API endpoints
 app.use((req, res, next) => {
-  // Skip CSRF for public endpoints that don't modify state
+  // Skip CSRF for public endpoints that don't modify state or initial auth
   const publicPaths = [
     '/api/health',
     '/api/random-image',
@@ -68,7 +68,9 @@ app.use((req, res, next) => {
     '/api/images/',
     '/api/folders',
     '/api/upload-tokens/validate',
-    '/api/auth/session'
+    '/api/auth/session',
+    '/api/auth/login',  // Allow login without CSRF (initial auth)
+    '/api/auth/pin'     // Allow PIN auth without CSRF
   ];
   
   const isPublicEndpoint = publicPaths.some(path => req.path.startsWith(path));
@@ -76,7 +78,7 @@ app.use((req, res, next) => {
   const isTokenUpload = req.path === '/api/token/upload' || req.path === '/api/token/folders';
   
   // Skip CSRF for public GET requests and token-based uploads (which use token auth)
-  if (isPublicEndpoint && isGetRequest || isTokenUpload) {
+  if (isPublicEndpoint && isGetRequest || isTokenUpload || publicPaths.includes(req.path)) {
     return next();
   }
   

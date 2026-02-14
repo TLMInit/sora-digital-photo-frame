@@ -13,7 +13,10 @@ const csrfProtection = csrf({
 
 // Middleware to attach CSRF token to response locals for templates
 const attachCsrfToken = (req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
+  // Only attach CSRF token if the csrfToken function is available
+  if (typeof req.csrfToken === 'function') {
+    res.locals.csrfToken = req.csrfToken();
+  }
   next();
 };
 
@@ -42,8 +45,8 @@ const addCsrfTokenToResponse = (req, res, next) => {
   const originalJson = res.json;
   
   res.json = function(data) {
-    // Only add CSRF token for successful responses to GET requests
-    if (req.method === 'GET' && res.statusCode === 200 && typeof data === 'object' && data !== null) {
+    // Only add CSRF token for successful responses to GET requests if csrfToken function exists
+    if (typeof req.csrfToken === 'function' && req.method === 'GET' && res.statusCode === 200 && typeof data === 'object' && data !== null) {
       data._csrf = req.csrfToken();
     }
     return originalJson.call(this, data);
