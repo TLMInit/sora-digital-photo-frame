@@ -60,9 +60,29 @@ class UploadMetadataController {
         await this.saveMetadata(metadata);
     }
 
+    async recordTokenUploads(tokenId, tokenName, filePaths) {
+        const metadata = await this.loadMetadata();
+        const uploadedAt = new Date().toISOString();
+        for (const filePath of filePaths) {
+            metadata.push({
+                tokenId,
+                tokenName,
+                filePath,
+                uploadedAt,
+                uploadType: 'token'
+            });
+        }
+        await this.saveMetadata(metadata);
+    }
+
     async getUploadsByAccount(accountId) {
         const metadata = await this.loadMetadata();
         return metadata.filter(entry => entry.accountId === accountId);
+    }
+
+    async getUploadsByToken(tokenId) {
+        const metadata = await this.loadMetadata();
+        return metadata.filter(entry => entry.tokenId === tokenId);
     }
 
     async isOwnedByAccount(accountId, filePath) {

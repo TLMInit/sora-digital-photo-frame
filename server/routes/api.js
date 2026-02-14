@@ -5,8 +5,9 @@ const folderController = require('../controllers/folderController');
 const accessAccountController = require('../controllers/accessAccountController');
 const googlePhotosController = require('../controllers/googlePhotosController');
 const guestUploadController = require('../controllers/guestUploadController');
+const uploadTokenController = require('../controllers/uploadTokenController');
 const upload = require('../middleware/upload');
-const { requireAuth, requireUploadAuth } = require('../middleware/auth');
+const { requireAuth, requireUploadAuth, requireUploadToken } = require('../middleware/auth');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -51,6 +52,18 @@ router.get('/features', requireAuth, (req, res) => {
 router.post('/auth/pin', accessAccountController.authenticateWithPin.bind(accessAccountController));
 router.get('/auth/session', accessAccountController.getSession.bind(accessAccountController));
 router.delete('/auth/session', accessAccountController.clearSession.bind(accessAccountController));
+
+// Upload token management routes (admin only)
+router.post('/upload-tokens', requireAuth, uploadTokenController.createToken.bind(uploadTokenController));
+router.get('/upload-tokens', requireAuth, uploadTokenController.getAllTokens.bind(uploadTokenController));
+router.get('/upload-tokens/:id', requireAuth, uploadTokenController.getToken.bind(uploadTokenController));
+router.patch('/upload-tokens/:id', requireAuth, uploadTokenController.updateToken.bind(uploadTokenController));
+router.delete('/upload-tokens/:id', requireAuth, uploadTokenController.deleteToken.bind(uploadTokenController));
+
+// Public token validation and upload routes
+router.get('/upload-tokens/validate', uploadTokenController.validateToken.bind(uploadTokenController));
+router.post('/token/upload', requireUploadToken, upload.array('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
+router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
 
 // Guest upload routes (requires PIN auth with upload access)
 router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));

@@ -157,10 +157,78 @@ const requireUploadAuth = (req, res, next) => {
   return res.redirect('/login');
 };
 
+// Check if request has valid upload token
+const requireUploadToken = async (req, res, next) => {
+  const uploadTokenController = require('../controllers/uploadTokenController');
+  
+  // Get token from query parameter
+  const plainToken = req.query.token || req.body.token;
+
+  if (!plainToken) {
+    const isApiRequest = req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
+    
+    if (isApiRequest) {
+      return res.status(401).json({
+        success: false,
+        error: 'Upload token is required',
+        code: 'TOKEN_REQUIRED'
+      });
+    }
+    return res.redirect('/guest-upload');
+  }
+
+  try {
+    // Find and validate the token
+    const token = await uploadTokenController.findTokenByPlainToken(plainToken);
+
+    if (!token) {
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid upload token'
+      });
+    }
+
+    // Check if token is enabled
+    if (!token.enabled) {
+      return res.status(403).json({
+        success: false,
+        error: 'This upload link has been disabled'
+      });
+    }
+
+    // Check if token is expired
+    if (token.expiresAt && Date.now() > token.expiresAt) {
+      return res.status(403).json({
+        success: false,
+        error: 'This upload link has expired'
+      });
+    }
+
+    // Check if upload limit reached
+    if (token.uploadLimit && token.uploadCount >= token.uploadLimit) {
+      return res.status(403).json({
+        success: false,
+        error: 'Upload limit reached for this link'
+      });
+    }
+
+    // Attach token info to request for use in controllers
+    req.uploadToken = token;
+    next();
+  } catch (error) {
+    console.error('Error validating upload token:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to validate upload token'
+    });
+  }
+};
+
 module.exports = {
   requireAuth,
   requireGuest,
   requireUploadAuth,
+  requireUploadToken,
   login,
   logout,
   getAuthStatus
