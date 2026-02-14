@@ -758,6 +758,10 @@
                     <span id="uploadCount">0</span> 
                     <span id="uploadLimitText"></span>
                 </div>
+                <button id="googlePhotosBtn" class="btn-outline" title="Import from Google Photos" style="display:none;">
+                    <span class="material-symbols-outlined">photo_library</span>
+                    Google Photos
+                </button>
                 <button id="uploadBtn" class="btn" title="Upload Images">
                     <span class="material-symbols-outlined">upload</span>
                     Upload
@@ -930,10 +934,46 @@
             <span class="fab-badge" id="fabBadge">0</span>
         </div>
 
+        <!-- Google Photos Modal -->
+        <div id="googlePhotosModal" class="modal hidden">
+            <div class="modal-content card card-elevated">
+                <h2 class="light-title">Import from Google Photos</h2>
+                <div class="google-photos-content">
+                    <div id="sessionLoadingState" class="session-state">
+                        <div class="session-loader">
+                            <div class="spinner"></div>
+                        </div>
+                        <p>Creating Google Photos session...</p>
+                    </div>
+                    <div id="sessionReadyState" class="session-state hidden">
+                        <div class="session-icon">
+                            <span class="material-symbols-outlined">photo_library</span>
+                        </div>
+                        <p>Google Photos session is ready!</p>
+                        <button id="openSessionBtn" class="btn btn-primary">
+                            <span class="material-symbols-outlined">open_in_new</span>
+                            Open Google Photos Picker
+                        </button>
+                    </div>
+                    <div id="sessionErrorState" class="session-state hidden">
+                        <div class="session-icon error">
+                            <span class="material-symbols-outlined">error</span>
+                        </div>
+                        <p id="sessionErrorMessage">Failed to create session</p>
+                        <button id="retrySessionBtn" class="btn btn-secondary">Try Again</button>
+                    </div>
+                </div>
+                <button id="closeGooglePhotosModal" class="modal-close-btn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Basecoat Toast Container -->
         <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end"></div>
     </div>
 
+    <script src="js/googlePhotosSync.js"></script>
     <script src="guest-upload.js"></script>
 </body>
 

@@ -301,8 +301,9 @@ class UploadTokensManager {
             const form = document.getElementById('tokenForm');
             const formData = new FormData(form);
             
-            const expiresInDays = parseInt(formData.get('expiresInDays')) || 30;
-            const expiresAt = Date.now() + (expiresInDays * 24 * 60 * 60 * 1000);
+            const expiresInDays = parseInt(formData.get('expiresInDays'));
+            // If 0 days, set to null (never expires). Otherwise calculate expiration timestamp
+            const expiresAt = expiresInDays === 0 ? null : Date.now() + ((expiresInDays || 30) * 24 * 60 * 60 * 1000);
             
             const tokenData = {
                 name: formData.get('name'),

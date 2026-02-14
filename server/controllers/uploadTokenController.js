@@ -73,7 +73,8 @@ class UploadTokenController {
                 tokenHash: tokenHash,
                 name: name || 'Unnamed Token',
                 createdAt: Date.now(),
-                expiresAt: expiresAt || (Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+                // If expiresAt is null, token never expires. Otherwise use provided value or default to 30 days
+                expiresAt: expiresAt === null ? null : (expiresAt || (Date.now() + 30 * 24 * 60 * 60 * 1000)),
                 uploadLimit: uploadLimit || null,
                 uploadCount: 0,
                 enabled: true,
