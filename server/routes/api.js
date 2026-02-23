@@ -36,6 +36,7 @@ router.post('/upload', requireAuth, upload.array('images'), imageController.uplo
 router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
 router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));
+router.post('/admin/images/move', requireAuth, imageController.moveImages.bind(imageController));
 
 // Folder management routes (protected)
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));

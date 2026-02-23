@@ -409,6 +409,85 @@ class ImageController {
       res.status(500).json({ message: 'Server error' });
     }
   }
+
+  // Move images to a different folder
+  async moveImages(req, res) {
+    try {
+      const { paths, destinationPath } = req.body;
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return res.status(400).json({ message: 'Invalid paths provided' });
+      }
+
+      if (!destinationPath || !isPathSafe(destinationPath)) {
+        return res.status(400).json({ message: 'Invalid destination path' });
+      }
+
+      const destDir = path.join(__dirname, '..', destinationPath);
+      if (!await fs.pathExists(destDir)) {
+        return res.status(400).json({ message: 'Destination folder does not exist' });
+      }
+
+      const destStat = await fs.stat(destDir);
+      if (!destStat.isDirectory()) {
+        return res.status(400).json({ message: 'Destination is not a folder' });
+      }
+
+      const results = { movedCount: 0, failedCount: 0, errors: [] };
+
+      for (const imagePath of paths) {
+        try {
+          if (!isPathSafe(imagePath)) {
+            results.failedCount++;
+            results.errors.push(`Invalid path: ${imagePath}`);
+            continue;
+          }
+
+          const fullPath = path.join(__dirname, '..', imagePath);
+          if (!await fs.pathExists(fullPath)) {
+            results.failedCount++;
+            results.errors.push(`File not found: ${imagePath}`);
+            continue;
+          }
+
+          const fileStat = await fs.stat(fullPath);
+          if (!fileStat.isFile()) {
+            results.failedCount++;
+            results.errors.push(`Not a file: ${imagePath}`);
+            continue;
+          }
+
+          const filename = path.basename(imagePath);
+          const targetPath = path.join(destDir, filename);
+
+          await fs.move(fullPath, targetPath, { overwrite: false });
+          results.movedCount++;
+        } catch (error) {
+          console.error(`Error moving ${imagePath}:`, error);
+          results.failedCount++;
+          results.errors.push(`Failed to move: ${imagePath}`);
+        }
+      }
+
+      // Clear cache after moving
+      this.clearImageCache();
+
+      if (results.failedCount > 0) {
+        res.status(207).json({
+          message: `Moved ${results.movedCount} images, failed to move ${results.failedCount}`,
+          ...results
+        });
+      } else {
+        res.json({
+          message: `Successfully moved ${results.movedCount} images`,
+          ...results
+        });
+      }
+    } catch (error) {
+      console.error('Error moving images:', error);
+      res.status(500).json({ message: 'Server error during move' });
+    }
+  }
 }
 
 module.exports = new ImageController();

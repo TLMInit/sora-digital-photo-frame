@@ -665,6 +665,100 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
   });
 
   // ============================================================
+  // IMAGE MOVE
+  // ============================================================
+  describe('Image Move', () => {
+    beforeAll(async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+      // Create a test image to move
+      const img = await createTestImageBuffer({ r: 128, g: 128, b: 0 });
+      await fs.writeFile(path.join(uploadsDir, 'family', 'moveme.jpg'), img);
+    });
+
+    afterAll(async () => {
+      // Clean up moved files
+      await fs.remove(path.join(uploadsDir, 'vacation', 'moveme.jpg')).catch(() => {});
+      await fs.remove(path.join(uploadsDir, 'family', 'moveme.jpg')).catch(() => {});
+    });
+
+    test('POST /api/admin/images/move should move image to destination folder', async () => {
+      const res = await adminAgent
+        .post('/api/admin/images/move')
+        .send({
+          paths: ['uploads/family/moveme.jpg'],
+          destinationPath: 'uploads/vacation'
+        })
+        .set('Content-Type', 'application/json')
+        .set('X-CSRF-Token', csrfToken);
+
+      expect(res.status).toBe(200);
+      expect(res.body.movedCount).toBe(1);
+      expect(res.body.failedCount).toBe(0);
+      // Verify file exists in destination
+      const exists = await fs.pathExists(path.join(uploadsDir, 'vacation', 'moveme.jpg'));
+      expect(exists).toBe(true);
+    });
+
+    test('POST /api/admin/images/move without auth should fail', async () => {
+      const res = await request(app)
+        .post('/api/admin/images/move')
+        .send({
+          paths: ['uploads/family/photo1.jpg'],
+          destinationPath: 'uploads/vacation'
+        })
+        .set('Content-Type', 'application/json');
+
+      // CSRF middleware may return 403 before auth middleware returns 401
+      expect([401, 403]).toContain(res.status);
+    });
+
+    test('POST /api/admin/images/move with invalid destination should fail', async () => {
+      const res = await adminAgent
+        .post('/api/admin/images/move')
+        .send({
+          paths: ['uploads/family/photo1.jpg'],
+          destinationPath: '../../etc'
+        })
+        .set('Content-Type', 'application/json')
+        .set('X-CSRF-Token', csrfToken);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Invalid destination path');
+    });
+
+    test('POST /api/admin/images/move with empty paths should fail', async () => {
+      const res = await adminAgent
+        .post('/api/admin/images/move')
+        .send({
+          paths: [],
+          destinationPath: 'uploads/vacation'
+        })
+        .set('Content-Type', 'application/json')
+        .set('X-CSRF-Token', csrfToken);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Invalid paths provided');
+    });
+
+    test('POST /api/admin/images/move with nonexistent file should report failure', async () => {
+      const res = await adminAgent
+        .post('/api/admin/images/move')
+        .send({
+          paths: ['uploads/family/nonexistent.jpg'],
+          destinationPath: 'uploads/vacation'
+        })
+        .set('Content-Type', 'application/json')
+        .set('X-CSRF-Token', csrfToken);
+
+      expect(res.status).toBe(207);
+      expect(res.body.failedCount).toBe(1);
+    });
+  });
+
+  // ============================================================
   // SLIDESHOW IMAGE DELIVERY (PIN-auth with folder restrictions)
   // ============================================================
   describe('Slideshow Image Delivery with Access Control', () => {
