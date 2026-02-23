@@ -261,6 +261,7 @@ class PhotoFrameAdmin {
 
         // Selection controls
         document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.showBulkDeleteModal());
+        document.getElementById('selectAllBtn').addEventListener('click', () => this.toggleSelectAll());
         
         // Bulk delete modal
         document.getElementById('cancelBulkDeleteBtn').addEventListener('click', () => this.hideBulkDeleteModal());
@@ -1365,6 +1366,33 @@ class PhotoFrameAdmin {
         this.updateSelectionUI();
     }
 
+    toggleSelectAll() {
+        const allSelected = this.availableImages.length > 0 && this.selectedItems.size === this.availableImages.length;
+        if (allSelected) {
+            this.clearSelection();
+        } else {
+            this.selectAllPhotos();
+        }
+    }
+
+    selectAllPhotos() {
+        this.availableImages.forEach(file => {
+            const filePath = file.path;
+            if (!this.selectedItems.has(filePath)) {
+                this.selectedItems.add(filePath);
+                const fileElement = document.querySelector(`[data-path="${filePath}"]`);
+                if (fileElement) {
+                    fileElement.classList.add('selected');
+                    const checkbox = fileElement.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        });
+        this.updateSelectionUI();
+    }
+
     updateSelectionUI() {
         const selectionCount = this.selectedItems.size;
         const fabBadge = document.getElementById('fabBadge');
@@ -1392,6 +1420,16 @@ class PhotoFrameAdmin {
             selectionFab.classList.remove('hidden');
         } else {
             selectionFab.classList.add('hidden');
+        }
+
+        // Update Select All button icon and tooltip
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const selectAllIcon = document.getElementById('selectAllIcon');
+        if (selectAllBtn && selectAllIcon) {
+            const allSelected = this.availableImages.length > 0 && selectionCount === this.availableImages.length;
+            selectAllIcon.textContent = allSelected ? 'deselect' : 'select_all';
+            selectAllBtn.setAttribute('data-tooltip', allSelected ? 'Deselect All' : 'Select All');
+            selectAllBtn.setAttribute('aria-label', allSelected ? 'Deselect All' : 'Select All');
         }
     }
 
