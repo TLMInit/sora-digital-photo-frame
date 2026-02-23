@@ -460,6 +460,12 @@ class ImageController {
           const filename = path.basename(imagePath);
           const targetPath = path.join(destDir, filename);
 
+          if (await fs.pathExists(targetPath)) {
+            results.failedCount++;
+            results.errors.push(`File already exists in destination: ${filename}`);
+            continue;
+          }
+
           await fs.move(fullPath, targetPath, { overwrite: false });
           results.movedCount++;
         } catch (error) {
