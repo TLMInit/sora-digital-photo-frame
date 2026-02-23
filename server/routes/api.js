@@ -6,6 +6,7 @@ const accessAccountController = require('../controllers/accessAccountController'
 const googlePhotosController = require('../controllers/googlePhotosController');
 const guestUploadController = require('../controllers/guestUploadController');
 const uploadTokenController = require('../controllers/uploadTokenController');
+const frameController = require('../controllers/frameController');
 const upload = require('../middleware/upload');
 const { requireAuth, requireUploadAuth, requireUploadToken } = require('../middleware/auth');
 const { 
@@ -30,6 +31,15 @@ router.get('/images/:imageId/thumbnail', imageController.getImageThumbnail.bind(
 router.get('/folders', folderController.getFolderStructure.bind(folderController));
 router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
 router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbnail.bind(folderController));
+
+// Frame display routes (render endpoint is public like random-image, device config needs auth)
+router.get('/frame/render', frameController.renderImage.bind(frameController));
+router.get('/frame/devices', requireAuth, frameController.listDevices.bind(frameController));
+router.get('/frame/device/:deviceId', frameController.getDevice.bind(frameController));
+router.put('/frame/device/:deviceId', requireAuth, frameController.saveDevice.bind(frameController));
+router.delete('/frame/device/:deviceId', requireAuth, frameController.deleteDevice.bind(frameController));
+router.get('/frame/cache/stats', requireAuth, frameController.getCacheStats.bind(frameController));
+router.delete('/frame/cache', requireAuth, frameController.clearCache.bind(frameController));
 
 // Protected routes (authentication required)
 router.post('/upload', requireAuth, upload.array('images'), imageController.uploadImages.bind(imageController));

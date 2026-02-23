@@ -125,7 +125,7 @@ class ThumbnailManager {
     try {
       const items = await fs.readdir(dir, { withFileTypes: true });
       for (const item of items) {
-        if (item.name === THUMB_DIR) continue;
+        if (item.name === THUMB_DIR || item.name === '.render-cache') continue;
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
           const sub = await this.backfillThumbnails(fullPath);

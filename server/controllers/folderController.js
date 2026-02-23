@@ -66,7 +66,7 @@ class FolderController {
       
       // If no images found, check subdirectories
       for (const item of items) {
-        if (item.isDirectory() && item.name !== '.thumbs') {
+        if (item.isDirectory() && item.name !== '.thumbs' && item.name !== '.render-cache') {
           const subImage = await this.findFirstImage(path.join(dir, item.name));
           if (subImage) {
             return subImage;
@@ -87,7 +87,7 @@ class FolderController {
       const items = await fs.readdir(dir, { withFileTypes: true });
       
       for (const item of items) {
-        if (item.name === '.thumbs') continue;
+        if (item.name === '.thumbs' || item.name === '.render-cache') continue;
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
           count += await this.countImagesInFolder(fullPath);
@@ -131,7 +131,7 @@ class FolderController {
       
       // Process folders
       for (const item of items) {
-        if (item.isDirectory() && item.name !== '.thumbs') {
+        if (item.isDirectory() && item.name !== '.thumbs' && item.name !== '.render-cache') {
           const itemPath = path.join(fullPath, item.name);
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
           
@@ -299,7 +299,7 @@ class FolderController {
       const files = [];
       
       for (const item of items) {
-        if (item.name === '.thumbs') continue; // Skip thumbs directory
+        if (item.name === '.thumbs' || item.name === '.render-cache') continue; // Skip cache directories
         if (item.isDirectory()) {
           folders.push({
             name: item.name,

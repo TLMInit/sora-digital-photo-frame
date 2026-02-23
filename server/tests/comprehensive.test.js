@@ -852,6 +852,117 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
   });
 
   // ============================================================
+  // FRAME RENDER ENDPOINT
+  // ============================================================
+  describe('Frame Render Endpoint', () => {
+    beforeAll(async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+    });
+
+    test('GET /api/frame/render should return rendered image with valid params', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ path: 'family/photo1.jpg', w: 800, h: 600, format: 'jpeg' });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('image/jpeg');
+      expect(res.headers['x-render-cache']).toBe('MISS');
+      expect(res.headers['cache-control']).toMatch(/immutable/);
+    });
+
+    test('GET /api/frame/render should serve from cache on second request', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ path: 'family/photo1.jpg', w: 800, h: 600, format: 'jpeg' });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['x-render-cache']).toBe('HIT');
+    });
+
+    test('GET /api/frame/render with webp format should return webp', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ path: 'family/photo1.jpg', w: 1920, h: 1080, format: 'webp' });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('image/webp');
+    });
+
+    test('GET /api/frame/render without path should return 400', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ w: 800, h: 600 });
+
+      expect(res.status).toBe(400);
+    });
+
+    test('GET /api/frame/render with path traversal should be rejected', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ path: '../../etc/passwd', w: 800, h: 600 });
+
+      expect(res.status).toBe(400);
+    });
+
+    test('GET /api/frame/render without auth should return 401', async () => {
+      const res = await request(app)
+        .get('/api/frame/render')
+        .query({ path: 'family/photo1.jpg', w: 800, h: 600 });
+
+      expect(res.status).toBe(401);
+    });
+
+    test('GET /api/frame/render with nonexistent image should return 404', async () => {
+      const res = await adminAgent
+        .get('/api/frame/render')
+        .query({ path: 'nonexistent/image.jpg', w: 800, h: 600 });
+
+      expect(res.status).toBe(404);
+    });
+
+    test('.render-cache folder should not appear in folder listings', async () => {
+      const res = await adminAgent
+        .get('/api/admin/folders')
+        .query({ path: 'uploads' });
+
+      expect(res.status).toBe(200);
+      const folderNames = res.body.folders.map(f => f.name);
+      expect(folderNames).not.toContain('.render-cache');
+    });
+
+    test('Device config CRUD should work', async () => {
+      // Create device
+      const saveRes = await adminAgent
+        .put('/api/frame/device/test-pi')
+        .send({ displayWidth: 1280, displayHeight: 800, renderScale: 1.0, fitMode: 'contain', format: 'webp' })
+        .set('X-CSRF-Token', csrfToken)
+        .set('Content-Type', 'application/json');
+
+      expect(saveRes.status).toBe(200);
+      expect(saveRes.body.displayWidth).toBe(1280);
+
+      // Get device
+      const getRes = await adminAgent.get('/api/frame/device/test-pi');
+      expect(getRes.status).toBe(200);
+      expect(getRes.body.displayWidth).toBe(1280);
+
+      // List devices
+      const listRes = await adminAgent.get('/api/frame/devices');
+      expect(listRes.status).toBe(200);
+      expect(listRes.body['test-pi']).toBeDefined();
+
+      // Delete device
+      const delRes = await adminAgent
+        .delete('/api/frame/device/test-pi')
+        .set('X-CSRF-Token', csrfToken);
+      expect(delRes.status).toBe(200);
+    });
+  });
+
+  // ============================================================
   // SLIDESHOW IMAGE DELIVERY (PIN-auth with folder restrictions)
   // ============================================================
   describe('Slideshow Image Delivery with Access Control', () => {

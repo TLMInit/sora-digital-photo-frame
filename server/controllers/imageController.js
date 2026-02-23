@@ -32,7 +32,7 @@ class ImageController {
     const items = await fs.readdir(dir, { withFileTypes: true });
     
     for (const item of items) {
-      if (item.name === '.thumbs') continue; // Skip thumbnails directory
+      if (item.name === '.thumbs' || item.name === '.render-cache') continue; // Skip cache directories
       const fullPath = path.join(dir, item.name);
       if (item.isDirectory()) {
         const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion

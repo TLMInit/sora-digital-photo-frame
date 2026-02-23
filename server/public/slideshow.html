@@ -561,6 +561,10 @@
                 this.folderSelector = null;
                 this.folderStorage = new FolderStorage();
 
+                // Device display resolution for server-side rendering
+                this.displayWidth = window.screen.width * (window.devicePixelRatio || 1);
+                this.displayHeight = window.screen.height * (window.devicePixelRatio || 1);
+
                 this.initializeElements();
                 this.setupEventListeners();
                 this.setupCursorAutoHide();
@@ -686,6 +690,28 @@
                 }
             }
 
+            /**
+             * Build a render URL for server-side resized image optimized for this device.
+             */
+            getRenderUrl(imageData) {
+                // Extract the relative path from the URL (e.g. "/uploads/family/photo.jpg" -> "family/photo.jpg")
+                let relativePath = imageData.path || imageData.url;
+                if (relativePath.startsWith('/uploads/')) {
+                    relativePath = relativePath.slice('/uploads/'.length);
+                }
+                // Also strip protocol+host if full URL
+                try {
+                    const u = new URL(relativePath, window.location.origin);
+                    if (u.pathname.startsWith('/uploads/')) {
+                        relativePath = u.pathname.slice('/uploads/'.length);
+                    }
+                } catch { /* already relative */ }
+
+                const w = Math.round(this.displayWidth);
+                const h = Math.round(this.displayHeight);
+                return `/api/frame/render?path=${encodeURIComponent(relativePath)}&w=${w}&h=${h}&fit=contain&format=webp`;
+            }
+
             async loadImage(imageData) {
                 if (!imageData) return false;
 
@@ -713,7 +739,8 @@
 
                     img.addEventListener('load', onLoad);
                     img.addEventListener('error', onError);
-                    img.src = imageData.url;
+                    // Use server-side rendered image optimized for this device's resolution
+                    img.src = this.getRenderUrl(imageData);
                 });
             }
 
