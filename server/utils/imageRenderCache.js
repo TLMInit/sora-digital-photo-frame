@@ -116,22 +116,6 @@ class ImageRenderCache {
   }
 
   /**
-   * Delete all cached renders for a given source image.
-   */
-  async deleteCacheForImage(relativePath) {
-    const cacheRoot = path.join(this.uploadsDir, RENDER_CACHE_DIR);
-    try {
-      if (!await fs.pathExists(cacheRoot)) return;
-      // Walk all resolution dirs and delete matching cache files
-      // Since cache keys are hashed, we'd need to walk. For simplicity,
-      // we don't track individual files; the mtime-based key ensures stale
-      // renders are never served. Old cache entries can be cleaned up separately.
-    } catch {
-      // ignore
-    }
-  }
-
-  /**
    * Get cache stats (for admin info).
    */
   async getCacheStats() {

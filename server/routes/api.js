@@ -32,10 +32,10 @@ router.get('/folders', folderController.getFolderStructure.bind(folderController
 router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
 router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbnail.bind(folderController));
 
-// Frame display routes (render endpoint is public like random-image, device config needs auth)
+// Frame display routes (render requires session auth, device config requires admin auth)
 router.get('/frame/render', frameController.renderImage.bind(frameController));
 router.get('/frame/devices', requireAuth, frameController.listDevices.bind(frameController));
-router.get('/frame/device/:deviceId', frameController.getDevice.bind(frameController));
+router.get('/frame/device/:deviceId', requireAuth, frameController.getDevice.bind(frameController));
 router.put('/frame/device/:deviceId', requireAuth, frameController.saveDevice.bind(frameController));
 router.delete('/frame/device/:deviceId', requireAuth, frameController.deleteDevice.bind(frameController));
 router.get('/frame/cache/stats', requireAuth, frameController.getCacheStats.bind(frameController));
