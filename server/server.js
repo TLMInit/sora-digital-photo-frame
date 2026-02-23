@@ -128,6 +128,16 @@ app.use(attachCsrfToken);
 app.use(addCsrfTokenToResponse);
 
 // Static files - uploaded files require authentication
+// Thumbnails served with aggressive caching
+app.use('/uploads/.thumbs', (req, res, next) => {
+  if (req.session && (req.session.authenticated || req.session.accessAccount)) {
+    return next();
+  }
+  return res.status(401).json({ message: 'Authentication required' });
+}, express.static(path.join(__dirname, 'uploads', '.thumbs'), {
+  maxAge: '365d',
+  immutable: true
+}));
 app.use('/uploads', (req, res, next) => {
   if (req.session && (req.session.authenticated || req.session.accessAccount)) {
     return next();

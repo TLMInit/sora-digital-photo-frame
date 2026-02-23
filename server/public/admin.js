@@ -502,7 +502,7 @@ class PhotoFrameAdmin {
         div.dataset.type = 'image';
         div.innerHTML = `
             <div class="admin-photo-image">
-                <img src="${file.url}" alt="${file.name}" loading="lazy">
+                <img src="${file.thumbnailUrl || file.url}" alt="${file.name}" loading="lazy">
             </div>
             <div class="photo-grid-overlay">
                 <div class="photo-grid-overlay-top">

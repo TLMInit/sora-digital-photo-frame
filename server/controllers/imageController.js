@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const { isPathSafe } = require('../utils/pathValidator');
+const thumbnailManager = require('../utils/thumbnailManager');
 
 class ImageController {
   constructor() {
@@ -26,6 +27,7 @@ class ImageController {
     const items = await fs.readdir(dir, { withFileTypes: true });
     
     for (const item of items) {
+      if (item.name === '.thumbs') continue; // Skip thumbnails directory
       const fullPath = path.join(dir, item.name);
       if (item.isDirectory()) {
         const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion
@@ -264,6 +266,10 @@ class ImageController {
         await fs.remove(file.path);
         await fs.move(processedPath, targetFilePath);
         
+        // Generate thumbnail for the uploaded image
+        const relativePath = path.relative(this.uploadsDir, targetFilePath);
+        await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
+        
         processedFiles.push({
           filename: file.filename,
           originalname: file.originalname,
@@ -299,6 +305,11 @@ class ImageController {
       }
       
       await fs.remove(fullPath);
+      
+      // Delete associated thumbnail
+      const relativePath = path.relative(path.join(__dirname, '..'), imagePath);
+      const uploadsRelative = relativePath.startsWith('uploads' + path.sep) ? relativePath.slice(('uploads' + path.sep).length) : relativePath;
+      await thumbnailManager.deleteThumbnail(uploadsRelative);
       
       // Clear cache after deletion to update available images
       this.clearImageCache();
@@ -336,6 +347,10 @@ class ImageController {
           
           if (await fs.pathExists(fullPath)) {
             await fs.remove(fullPath);
+            // Delete associated thumbnail
+            const relativePath = path.relative(path.join(__dirname, '..'), imagePath);
+            const uploadsRelative = relativePath.startsWith('uploads' + path.sep) ? relativePath.slice(('uploads' + path.sep).length) : relativePath;
+            await thumbnailManager.deleteThumbnail(uploadsRelative);
             results.deletedCount++;
           } else {
             results.failedCount++;
@@ -398,6 +413,11 @@ class ImageController {
       // Replace original with rotated image
       await fs.remove(fullPath);
       await fs.move(tempPath, fullPath);
+      
+      // Regenerate thumbnail for rotated image
+      const relativePath = path.relative(this.uploadsDir, fullPath);
+      await thumbnailManager.deleteThumbnail(relativePath);
+      await thumbnailManager.generateThumbnail(relativePath, fullPath);
       
       // Clear cache after rotation to update available images
       this.clearImageCache();
@@ -467,6 +487,10 @@ class ImageController {
           }
 
           await fs.move(fullPath, targetPath, { overwrite: false });
+          // Move associated thumbnail
+          const oldRelative = path.relative(this.uploadsDir, fullPath);
+          const newRelative = path.relative(this.uploadsDir, targetPath);
+          await thumbnailManager.moveThumbnail(oldRelative, newRelative);
           results.movedCount++;
         } catch (error) {
           console.error(`Error moving ${imagePath}:`, error);

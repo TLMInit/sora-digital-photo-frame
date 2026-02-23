@@ -38,6 +38,18 @@ router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bi
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));
 router.post('/admin/images/move', requireAuth, imageController.moveImages.bind(imageController));
 
+// Thumbnail backfill endpoint (admin only)
+const thumbnailManager = require('../utils/thumbnailManager');
+router.post('/admin/thumbnails/generate', requireAuth, async (req, res) => {
+  try {
+    const stats = await thumbnailManager.backfillThumbnails();
+    res.json({ message: 'Thumbnail generation complete', ...stats });
+  } catch (error) {
+    console.error('Error generating thumbnails:', error);
+    res.status(500).json({ message: 'Server error during thumbnail generation' });
+  }
+});
+
 // Folder management routes (protected)
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));
 router.post('/admin/folders', requireAuth, folderController.createFolder.bind(folderController));

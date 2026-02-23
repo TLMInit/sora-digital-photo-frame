@@ -4,6 +4,7 @@ const sharp = require('sharp');
 const uploadMetadataController = require('./uploadMetadataController');
 const imageController = require('./imageController');
 const { isPathSafe } = require('../utils/pathValidator');
+const thumbnailManager = require('../utils/thumbnailManager');
 
 class GuestUploadController {
     constructor() {
@@ -169,6 +170,10 @@ class GuestUploadController {
                 await fs.remove(file.path);
                 await fs.move(processedPath, targetFilePath);
 
+                // Generate thumbnail
+                const relativePath = path.relative(this.uploadsDir, targetFilePath);
+                await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
+
                 const relativeFilePath = path.join(targetPath, file.filename);
                 uploadedPaths.push(relativeFilePath);
 
@@ -239,6 +244,10 @@ class GuestUploadController {
 
                 await fs.remove(file.path);
                 await fs.move(processedPath, targetFilePath);
+
+                // Generate thumbnail
+                const relativePath = path.relative(this.uploadsDir, targetFilePath);
+                await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
 
                 const relativeFilePath = path.join(targetPath, file.filename);
                 uploadedPaths.push(relativeFilePath);

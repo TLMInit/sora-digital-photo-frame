@@ -150,6 +150,16 @@ class JobManager {
         const imageBuffer = await response.arrayBuffer();
         await fs.writeFile(filePath, Buffer.from(imageBuffer));
 
+        // Generate thumbnail for the imported image
+        try {
+          const thumbnailManager = require('./thumbnailManager');
+          const uploadsDir = path.join(process.cwd(), 'uploads');
+          const relativePath = path.relative(uploadsDir, filePath);
+          await thumbnailManager.generateThumbnail(relativePath, filePath);
+        } catch (thumbErr) {
+          console.warn('⚠️ [DEBUG] Failed to generate thumbnail for imported photo:', thumbErr.message);
+        }
+
         console.log('✅ [DEBUG] Successfully imported:', filename);
         job.progress.completed++;
         importResults.push({
