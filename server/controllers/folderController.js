@@ -314,7 +314,7 @@ class FolderController {
             type: 'image',
             path: path.join(folderPath, item.name),
             url: `/uploads/${relativePath}`,
-            thumbnailUrl: thumbnailUrl || `/uploads/${relativePath}`
+            thumbnailUrl: thumbnailUrl || `/api/images/${encodeURIComponent(relativePath)}/thumbnail`
           });
         }
       }

@@ -207,10 +207,21 @@ class ImageController {
         });
       }
       
-      // Generate thumbnail
+      // Try to serve pre-generated static thumbnail first
+      const thumbPath = thumbnailManager.getThumbPath(imageId);
+      if (await fs.pathExists(thumbPath)) {
+        res.set({
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable'
+        });
+        return res.sendFile(thumbPath);
+      }
+      
+      // Generate thumbnail on-the-fly as fallback
       const thumbnailBuffer = await sharp(imagePath)
-        .resize(200, 200, { fit: 'cover' })
-        .jpeg({ quality: 80 })
+        .resize(320, 320, { fit: 'inside', withoutEnlargement: true })
+        .rotate()
+        .jpeg({ quality: 75 })
         .toBuffer();
       
       res.set({
