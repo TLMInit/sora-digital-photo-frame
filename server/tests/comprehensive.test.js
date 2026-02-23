@@ -759,6 +759,99 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
   });
 
   // ============================================================
+  // THUMBNAIL GENERATION
+  // ============================================================
+  describe('Thumbnail Generation', () => {
+    beforeAll(async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+    });
+
+    test('GET /api/admin/folders should include thumbnailUrl for images', async () => {
+      const res = await adminAgent
+        .get('/api/admin/folders')
+        .query({ path: 'uploads/family' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.files).toBeDefined();
+      if (res.body.files.length > 0) {
+        const file = res.body.files[0];
+        expect(file.thumbnailUrl).toBeDefined();
+        expect(file.thumbnailUrl).toMatch(/\.thumbs/);
+        expect(file.url).toBeDefined();
+        // url should be original, thumbnailUrl should point to .thumbs
+        expect(file.url).not.toMatch(/\.thumbs/);
+      }
+    });
+
+    test('Thumbnail files should be created on disk', async () => {
+      const thumbsDir = path.join(uploadsDir, '.thumbs', 'family');
+      const exists = await fs.pathExists(thumbsDir);
+      // Thumbnails are generated on-demand by getFolderContents
+      if (exists) {
+        const files = await fs.readdir(thumbsDir);
+        expect(files.length).toBeGreaterThan(0);
+        // Thumbnails should be much smaller than originals
+        for (const f of files) {
+          const stat = await fs.stat(path.join(thumbsDir, f));
+          expect(stat.size).toBeLessThan(200 * 1024); // Less than 200KB
+        }
+      }
+    });
+
+    test('.thumbs folder should not appear in folder listings', async () => {
+      const res = await adminAgent
+        .get('/api/admin/folders')
+        .query({ path: 'uploads' });
+
+      expect(res.status).toBe(200);
+      const folderNames = res.body.folders.map(f => f.name);
+      expect(folderNames).not.toContain('.thumbs');
+    });
+
+    test('POST /api/admin/thumbnails/generate should backfill thumbnails', async () => {
+      const res = await adminAgent
+        .post('/api/admin/thumbnails/generate')
+        .set('X-CSRF-Token', csrfToken);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/Thumbnail generation complete/);
+      expect(typeof res.body.generated).toBe('number');
+      expect(typeof res.body.skipped).toBe('number');
+    });
+
+    test('POST /api/admin/thumbnails/generate without auth should fail', async () => {
+      const res = await request(app)
+        .post('/api/admin/thumbnails/generate');
+      expect([401, 403]).toContain(res.status);
+    });
+
+    test('Uploaded image should get a thumbnail', async () => {
+      const imgBuf = await createTestImageBuffer({ r: 50, g: 100, b: 200 });
+      const uploadRes = await adminAgent
+        .post('/api/upload')
+        .field('path', 'uploads/family')
+        .attach('images', imgBuf, 'thumb-test.jpg')
+        .set('X-CSRF-Token', csrfToken);
+      expect(uploadRes.status).toBe(200);
+
+      // Check that thumbnail was created
+      const uploadedFile = uploadRes.body.files[0];
+      const relativePath = path.relative(uploadsDir, uploadedFile.path);
+      const parsed = path.parse(relativePath);
+      const thumbPath = path.join(uploadsDir, '.thumbs', parsed.dir, parsed.name + '.jpg');
+      const thumbExists = await fs.pathExists(thumbPath);
+      expect(thumbExists).toBe(true);
+
+      // Clean up
+      await fs.remove(uploadedFile.path).catch(() => {});
+      await fs.remove(thumbPath).catch(() => {});
+    });
+  });
+
+  // ============================================================
   // SLIDESHOW IMAGE DELIVERY (PIN-auth with folder restrictions)
   // ============================================================
   describe('Slideshow Image Delivery with Access Control', () => {

@@ -15,6 +15,11 @@ class ImageController {
     this.cacheExpiry = parseInt(process.env.IMAGE_CACHE_EXPIRY) || 60000; // Cache for 1 minute
   }
 
+  // Extract uploads-relative path from an API path like "uploads/family/photo.jpg" → "family/photo.jpg"
+  uploadsRelativePath(imagePath) {
+    return imagePath.startsWith('uploads/') ? imagePath.slice('uploads/'.length) : imagePath;
+  }
+
   // Get all images recursively with caching
   async getAllImages(dir = this.uploadsDir, useCache = true) {
     // Check if cache is valid
@@ -307,9 +312,7 @@ class ImageController {
       await fs.remove(fullPath);
       
       // Delete associated thumbnail
-      const relativePath = path.relative(path.join(__dirname, '..'), imagePath);
-      const uploadsRelative = relativePath.startsWith('uploads' + path.sep) ? relativePath.slice(('uploads' + path.sep).length) : relativePath;
-      await thumbnailManager.deleteThumbnail(uploadsRelative);
+      await thumbnailManager.deleteThumbnail(this.uploadsRelativePath(imagePath));
       
       // Clear cache after deletion to update available images
       this.clearImageCache();
@@ -348,9 +351,7 @@ class ImageController {
           if (await fs.pathExists(fullPath)) {
             await fs.remove(fullPath);
             // Delete associated thumbnail
-            const relativePath = path.relative(path.join(__dirname, '..'), imagePath);
-            const uploadsRelative = relativePath.startsWith('uploads' + path.sep) ? relativePath.slice(('uploads' + path.sep).length) : relativePath;
-            await thumbnailManager.deleteThumbnail(uploadsRelative);
+            await thumbnailManager.deleteThumbnail(this.uploadsRelativePath(imagePath));
             results.deletedCount++;
           } else {
             results.failedCount++;
