@@ -1379,7 +1379,7 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
         expect(uploadedFile.thumbnail).toBeDefined();
         expect(uploadedFile.thumbnail).toContain('/api/images/');
         expect(uploadedFile.thumbnail).toContain('/thumbnail');
-        expect(uploadedFile.url).toContain('/uploads/');
+        expect(uploadedFile.url).toContain('/api/token/image');
 
         // Clean up
         const filename = uploadedFile.name;

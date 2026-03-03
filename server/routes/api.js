@@ -96,6 +96,7 @@ router.get('/upload-tokens/validate', tokenValidationLimiter, uploadTokenControl
 router.get('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.getToken.bind(uploadTokenController));
 router.post('/token/upload', tokenUploadLimiter, requireUploadToken, handleUpload('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
 router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
+router.get('/token/image', requireUploadToken, guestUploadController.serveTokenImage.bind(guestUploadController));
 
 // Guest upload routes (requires PIN auth with upload access)
 router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));

@@ -79,11 +79,12 @@ class GuestUploadController {
                             this.uploadsDir,
                             path.join(this.serverRoot, filePath)
                         );
+                        const tokenParam = encodeURIComponent(req.query.token || '');
                         files.push({
                             name: item.name,
                             type: 'image',
                             path: filePath,
-                            url: `/uploads/${relativePath}`,
+                            url: `/api/token/image?token=${tokenParam}&path=${encodeURIComponent(relativePath)}`,
                             thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail`,
                             ownedByUser: true
                         });
@@ -500,6 +501,38 @@ class GuestUploadController {
         } catch (error) {
             console.error('Error in batch delete (guest):', error);
             res.status(500).json({ message: 'Server error during batch deletion' });
+        }
+    }
+
+    // Serve an image file to token-authenticated users
+    async serveTokenImage(req, res) {
+        try {
+            const imagePath = req.query.path;
+            if (!imagePath) {
+                return res.status(400).json({ success: false, message: 'Image path is required' });
+            }
+
+            if (!isPathSafe(imagePath)) {
+                return res.status(400).json({ success: false, message: 'Invalid image path' });
+            }
+
+            const fullPath = path.join(this.uploadsDir, imagePath);
+
+            // Ensure resolved path is within uploads directory
+            const resolvedPath = path.resolve(fullPath);
+            const resolvedUploads = path.resolve(this.uploadsDir);
+            if (!resolvedPath.startsWith(resolvedUploads + path.sep) && resolvedPath !== resolvedUploads) {
+                return res.status(403).json({ success: false, message: 'Access denied' });
+            }
+
+            if (!await fs.pathExists(fullPath)) {
+                return res.status(404).json({ success: false, message: 'Image not found' });
+            }
+
+            res.sendFile(resolvedPath);
+        } catch (error) {
+            console.error('Error serving token image:', error);
+            res.status(500).json({ success: false, message: 'Server error' });
         }
     }
 }
