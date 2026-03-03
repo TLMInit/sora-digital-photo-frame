@@ -84,7 +84,7 @@ class UploadTokenController {
 
     async saveTokens(tokens) {
         // Atomic write: write to temp file, then rename to prevent corruption
-        const tmpFile = this.tokensFile + '.tmp.' + process.pid;
+        const tmpFile = this.tokensFile + '.tmp.' + crypto.randomBytes(8).toString('hex');
         await fs.writeFile(tmpFile, JSON.stringify(tokens, null, 2));
         await fs.rename(tmpFile, this.tokensFile);
     }
