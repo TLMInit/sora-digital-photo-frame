@@ -12,6 +12,23 @@ class GuestUploadController {
         this.serverRoot = path.join(__dirname, '..');
     }
 
+    /**
+     * Categorize a file processing error into a code and user-facing message.
+     */
+    categorizeFileError(error) {
+        // Sharp-specific errors
+        if (error.message && (error.message.includes('Input file') || error.message.includes('Input buffer') || error.message.includes('unsupported image format'))) {
+            return {
+                errorCode: 'IMAGE_PROCESSING_FAILED',
+                errorMessage: 'Image could not be processed. The file may be corrupted or not a valid image.'
+            };
+        }
+        return {
+            errorCode: 'FILE_IO_ERROR',
+            errorMessage: 'Failed to save file to destination folder.'
+        };
+    }
+
     // Get folder contents for token-based uploads - shows target folder only
     async getFolderContentsWithToken(req, res) {
         try {
@@ -233,18 +250,14 @@ class GuestUploadController {
                     // Clean up temp file on failure
                     await fs.remove(file.path).catch(() => {});
 
-                    const errorCode = fileError.message && fileError.message.includes('Input file')
-                        ? 'IMAGE_PROCESSING_FAILED'
-                        : 'FILE_IO_ERROR';
+                    const { errorCode, errorMessage } = this.categorizeFileError(fileError);
 
                     failedFiles.push({
                         filename: file.filename,
                         originalname: file.originalname,
                         success: false,
                         errorCode,
-                        errorMessage: errorCode === 'IMAGE_PROCESSING_FAILED'
-                            ? 'Image could not be processed. The file may be corrupted or not a valid image.'
-                            : 'Failed to save file to destination folder.'
+                        errorMessage
                     });
                 }
             }
@@ -349,18 +362,14 @@ class GuestUploadController {
                     console.error(`Error processing file ${file.originalname}:`, fileError);
                     await fs.remove(file.path).catch(() => {});
 
-                    const errorCode = fileError.message && fileError.message.includes('Input file')
-                        ? 'IMAGE_PROCESSING_FAILED'
-                        : 'FILE_IO_ERROR';
+                    const { errorCode, errorMessage } = this.categorizeFileError(fileError);
 
                     failedFiles.push({
                         filename: file.filename,
                         originalname: file.originalname,
                         success: false,
                         errorCode,
-                        errorMessage: errorCode === 'IMAGE_PROCESSING_FAILED'
-                            ? 'Image could not be processed. The file may be corrupted or not a valid image.'
-                            : 'Failed to save file to destination folder.'
+                        errorMessage
                     });
                 }
             }
