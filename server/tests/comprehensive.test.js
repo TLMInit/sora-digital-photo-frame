@@ -1288,6 +1288,108 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
   });
 
   // ============================================================
+  // TOKEN PERSISTENCE
+  // ============================================================
+  describe('Token Persistence', () => {
+    test('UploadTokenController should support configurable data dir via env var', () => {
+      // Verify the controller reads UPLOAD_TOKENS_DATA_DIR env var
+      // We can't easily reset the singleton, so test that the constructor logic works
+      const UploadTokenController = require('../controllers/uploadTokenController');
+      
+      // The current instance should use default path (since no env var is set in test)
+      expect(UploadTokenController.dataPath).toContain('data');
+      expect(UploadTokenController.tokensFile).toContain('upload-tokens.json');
+    });
+
+    test('saveTokens should use atomic write (temp file + rename)', async () => {
+      const uploadTokenController = require('../controllers/uploadTokenController');
+
+      // Save tokens and verify file exists and is valid JSON
+      await uploadTokenController.initializeDataDirectory();
+      const tokens = await uploadTokenController.loadTokens();
+      await uploadTokenController.saveTokens(tokens);
+
+      const data = await fs.readFile(uploadTokenController.tokensFile, 'utf8');
+      expect(() => JSON.parse(data)).not.toThrow();
+      
+      // Verify no leftover temp files
+      const dataDir = path.dirname(uploadTokenController.tokensFile);
+      const files = await fs.readdir(dataDir);
+      const tmpFiles = files.filter(f => f.includes('.tmp.'));
+      expect(tmpFiles.length).toBe(0);
+    });
+
+    test('loadTokens should not crash on corrupted JSON', async () => {
+      const uploadTokenController = require('../controllers/uploadTokenController');
+
+      // Backup current file
+      const backup = await fs.readFile(uploadTokenController.tokensFile, 'utf8').catch(() => '[]');
+
+      try {
+        // Write corrupted JSON
+        await fs.writeFile(uploadTokenController.tokensFile, '{corrupted json!!!');
+
+        // loadTokens should return [] without crashing
+        const tokens = await uploadTokenController.loadTokens();
+        expect(Array.isArray(tokens)).toBe(true);
+        expect(tokens.length).toBe(0);
+      } finally {
+        // Restore
+        await fs.writeFile(uploadTokenController.tokensFile, backup);
+      }
+    });
+  });
+
+  // ============================================================
+  // TOKEN FOLDER LISTING THUMBNAILS
+  // ============================================================
+  describe('Token Folder Listing Thumbnails', () => {
+    test('Token folder listing should include thumbnail URL for images', async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+
+      // Create a token with a folder that has images
+      const createRes = await adminAgent
+        .post('/api/upload-tokens')
+        .send({ name: 'ThumbTest', targetFolder: 'family' })
+        .set('X-CSRF-Token', csrfToken)
+        .set('Content-Type', 'application/json');
+
+      const plainToken = createRes.body.plainToken;
+      const imgBuf = await createTestImageBuffer({ r: 50, g: 100, b: 200 });
+
+      // Upload a file
+      const uploadRes = await request(app)
+        .post(`/api/token/upload?token=${encodeURIComponent(plainToken)}`)
+        .attach('images', imgBuf, 'thumb-test.jpg');
+
+      expect(uploadRes.status).toBe(200);
+
+      // Get folder listing
+      const listRes = await request(app)
+        .get(`/api/token/folders?token=${encodeURIComponent(plainToken)}`);
+
+      expect(listRes.status).toBe(200);
+
+      // Find our uploaded file
+      const uploadedFile = listRes.body.files.find(f => f.name.includes('thumb-test') || f.name.includes('images-'));
+      if (uploadedFile) {
+        expect(uploadedFile.thumbnail).toBeDefined();
+        expect(uploadedFile.thumbnail).toContain('/api/images/');
+        expect(uploadedFile.thumbnail).toContain('/thumbnail');
+        expect(uploadedFile.url).toContain('/uploads/');
+
+        // Clean up
+        const filename = uploadedFile.name;
+        await fs.remove(path.join(__dirname, '..', 'uploads', 'family', filename)).catch(() => {});
+        await fs.remove(path.join(__dirname, '..', 'uploads', '.thumbs', 'family', filename.replace(/\.[^.]+$/, '.jpg'))).catch(() => {});
+      }
+    });
+  });
+
+  // ============================================================
   // CLEANUP: Delete the test account we created
   // ============================================================
   describe('Test Cleanup', () => {

@@ -301,7 +301,7 @@ class GuestUploadManager {
             div.dataset.type = 'image';
             div.innerHTML = `
                 <div class="admin-photo-image">
-                    <img src="${file.url}" alt="${file.name}" loading="lazy">
+                    <img src="${file.thumbnail || file.url}" alt="${file.name}" loading="lazy" onerror="this.onerror=null;this.src='${file.url}';">
                 </div>
                 <div class="photo-grid-overlay">
                     <div class="photo-grid-overlay-top">

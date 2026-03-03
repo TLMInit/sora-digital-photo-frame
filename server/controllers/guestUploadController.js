@@ -84,6 +84,7 @@ class GuestUploadController {
                             type: 'image',
                             path: filePath,
                             url: `/uploads/${relativePath}`,
+                            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail`,
                             ownedByUser: true
                         });
                     }
@@ -157,6 +158,7 @@ class GuestUploadController {
                             type: 'image',
                             path: filePath,
                             url: `/uploads/${relativePath}`,
+                            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail`,
                             ownedByUser: true
                         });
                     }

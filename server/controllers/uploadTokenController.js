@@ -5,7 +5,10 @@ const bcrypt = require('bcryptjs');
 
 class UploadTokenController {
     constructor() {
-        this.dataPath = path.join(__dirname, '../data');
+        // Support configurable data directory via env vars (for Docker persistent volumes)
+        this.dataPath = process.env.UPLOAD_TOKENS_DATA_DIR
+            || process.env.DATA_DIR
+            || path.join(__dirname, '../data');
         this.tokensFile = path.join(this.dataPath, 'upload-tokens.json');
         // Use SESSION_SECRET for encryption key, or generate a persistent one
         this.encryptionKey = this.getEncryptionKey();
@@ -54,8 +57,13 @@ class UploadTokenController {
 
         try {
             await fs.access(this.tokensFile);
+            // File exists — load and log count
+            const tokens = await this.loadTokens();
+            console.log(`[UploadTokens] Loaded ${tokens.length} token(s) from ${this.tokensFile}`);
         } catch (error) {
+            // File doesn't exist — create empty tokens file
             await this.saveTokens([]);
+            console.log(`[UploadTokens] Created new tokens file at ${this.tokensFile}`);
         }
     }
 
@@ -64,12 +72,21 @@ class UploadTokenController {
             const data = await fs.readFile(this.tokensFile, 'utf8');
             return JSON.parse(data);
         } catch (error) {
+            if (error instanceof SyntaxError) {
+                // JSON parse error — do NOT overwrite with empty array
+                console.error(`[UploadTokens] CRITICAL: Failed to parse ${this.tokensFile} — file may be corrupted. NOT overwriting.`, error.message);
+                return [];
+            }
+            // File read error (e.g. file doesn't exist yet during init)
             return [];
         }
     }
 
     async saveTokens(tokens) {
-        await fs.writeFile(this.tokensFile, JSON.stringify(tokens, null, 2));
+        // Atomic write: write to temp file, then rename to prevent corruption
+        const tmpFile = this.tokensFile + '.tmp.' + process.pid;
+        await fs.writeFile(tmpFile, JSON.stringify(tokens, null, 2));
+        await fs.rename(tmpFile, this.tokensFile);
     }
 
     generateTokenId() {
