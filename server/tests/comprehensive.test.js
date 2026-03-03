@@ -963,6 +963,177 @@ describe('Digital Photo Frame - Comprehensive Test Suite', () => {
   });
 
   // ============================================================
+  // PATH NORMALIZATION AND TOKEN UPLOAD PATH FIX
+  // ============================================================
+  describe('Path Normalization (normalizeTargetFolder)', () => {
+    const { normalizeTargetFolder } = require('../utils/pathValidator');
+
+    test('should normalize "uploads" to "uploads"', () => {
+      const result = normalizeTargetFolder('uploads');
+      expect(result.valid).toBe(true);
+      expect(result.normalized).toBe('uploads');
+    });
+
+    test('should normalize "uploads/family" to "uploads/family"', () => {
+      const result = normalizeTargetFolder('uploads/family');
+      expect(result.valid).toBe(true);
+      expect(result.normalized).toBe('uploads/family');
+    });
+
+    test('should normalize bare folder "family" to "uploads/family" (back-compat)', () => {
+      const result = normalizeTargetFolder('family');
+      expect(result.valid).toBe(true);
+      expect(result.normalized).toBe('uploads/family');
+    });
+
+    test('should default null/undefined/empty to "uploads"', () => {
+      expect(normalizeTargetFolder(null).normalized).toBe('uploads');
+      expect(normalizeTargetFolder(undefined).normalized).toBe('uploads');
+      expect(normalizeTargetFolder('').normalized).toBe('uploads');
+      expect(normalizeTargetFolder('  ').normalized).toBe('uploads');
+    });
+
+    test('should reject absolute paths', () => {
+      const result = normalizeTargetFolder('/etc/passwd');
+      expect(result.valid).toBe(false);
+    });
+
+    test('should reject path traversal', () => {
+      const result = normalizeTargetFolder('../../../etc/passwd');
+      expect(result.valid).toBe(false);
+    });
+
+    test('should reject null bytes', () => {
+      const result = normalizeTargetFolder('uploads/test\0.jpg');
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  describe('Token Upload Path Fix', () => {
+    let tokenAgent;
+    let tokenPlainText;
+
+    beforeAll(async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+
+      // Create a token with bare folder name (the bug scenario)
+      const createRes = await adminAgent
+        .post('/api/upload-tokens')
+        .send({ name: 'PathTest', targetFolder: 'family' })
+        .set('X-CSRF-Token', csrfToken)
+        .set('Content-Type', 'application/json');
+
+      expect(createRes.status).toBe(200);
+      tokenPlainText = createRes.body.plainToken;
+    });
+
+    test('Token upload with bare folder "family" should save under uploads/family', async () => {
+      const imgBuf = await createTestImageBuffer({ r: 100, g: 200, b: 50 });
+
+      const res = await request(app)
+        .post(`/api/token/upload?token=${encodeURIComponent(tokenPlainText)}`)
+        .attach('images', imgBuf, 'path-test.jpg');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      // Verify the file is under uploads/family, not under <root>/family
+      const uploadsDir = path.join(__dirname, '..', 'uploads', 'family');
+      const serverRootFamily = path.join(__dirname, '..', 'family');
+
+      // Should exist in uploads/family
+      const uploadsFiles = await fs.readdir(uploadsDir);
+      const uploadedFile = uploadsFiles.find(f => f.includes('path-test') || f.includes('images-'));
+      expect(uploadedFile).toBeTruthy();
+
+      // Should NOT exist in <root>/family
+      const rootFamilyExists = await fs.pathExists(serverRootFamily);
+      // If rootFamilyExists, make sure our file isn't there
+      if (rootFamilyExists) {
+        const rootFiles = await fs.readdir(serverRootFamily);
+        const wrongFile = rootFiles.find(f => f.includes('path-test') || f.includes('images-'));
+        expect(wrongFile).toBeFalsy();
+      }
+
+      // Clean up
+      if (uploadedFile) {
+        await fs.remove(path.join(uploadsDir, uploadedFile)).catch(() => {});
+        // Also clean thumbnail
+        const thumbPath = path.join(__dirname, '..', 'uploads', '.thumbs', 'family', uploadedFile.replace(/\.[^.]+$/, '.jpg'));
+        await fs.remove(thumbPath).catch(() => {});
+      }
+    });
+
+    test('Token folder listing with bare folder should resolve to uploads/family', async () => {
+      const res = await request(app)
+        .get(`/api/token/folders?token=${encodeURIComponent(tokenPlainText)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.currentPath).toBe('uploads/family');
+    });
+  });
+
+  describe('Upload Error Reporting', () => {
+    test('Token upload with invalid file type should return INVALID_FILE_TYPE', async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+
+      // Create a simple token
+      const createRes = await adminAgent
+        .post('/api/upload-tokens')
+        .send({ name: 'ErrorTest', targetFolder: 'uploads' })
+        .set('X-CSRF-Token', csrfToken)
+        .set('Content-Type', 'application/json');
+
+      const plainToken = createRes.body.plainToken;
+
+      const res = await request(app)
+        .post(`/api/token/upload?token=${encodeURIComponent(plainToken)}`)
+        .attach('images', Buffer.from('not an image'), 'test.txt');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('INVALID_FILE_TYPE');
+    });
+
+    test('Upload error response should not expose filesystem paths', async () => {
+      if (!csrfToken) {
+        adminAgent = request.agent(app);
+        csrfToken = await loginAsAdmin(adminAgent);
+      }
+
+      const createRes = await adminAgent
+        .post('/api/upload-tokens')
+        .send({ name: 'SafeTest', targetFolder: 'uploads' })
+        .set('X-CSRF-Token', csrfToken)
+        .set('Content-Type', 'application/json');
+
+      const plainToken = createRes.body.plainToken;
+      const imgBuf = await createTestImageBuffer();
+
+      const res = await request(app)
+        .post(`/api/token/upload?token=${encodeURIComponent(plainToken)}`)
+        .attach('images', imgBuf, 'safe-test.jpg');
+
+      // Response should not contain any absolute paths
+      const responseText = JSON.stringify(res.body);
+      expect(responseText).not.toContain('/home/');
+      expect(responseText).not.toContain(__dirname);
+
+      // Clean up uploaded file
+      if (res.body.files && res.body.files[0]) {
+        const filename = res.body.files[0].filename;
+        await fs.remove(path.join(__dirname, '..', 'uploads', filename)).catch(() => {});
+      }
+    });
+  });
+
+  // ============================================================
   // SLIDESHOW IMAGE DELIVERY (PIN-auth with folder restrictions)
   // ============================================================
   describe('Slideshow Image Delivery with Access Control', () => {

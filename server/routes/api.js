@@ -8,6 +8,7 @@ const guestUploadController = require('../controllers/guestUploadController');
 const uploadTokenController = require('../controllers/uploadTokenController');
 const frameController = require('../controllers/frameController');
 const upload = require('../middleware/upload');
+const { handleUpload } = require('../middleware/upload');
 const { requireAuth, requireUploadAuth, requireUploadToken } = require('../middleware/auth');
 const { 
   tokenValidationLimiter, 
@@ -93,12 +94,12 @@ router.delete('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadT
 // With rate limiting to prevent abuse
 router.get('/upload-tokens/validate', tokenValidationLimiter, uploadTokenController.validateToken.bind(uploadTokenController));
 router.get('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.getToken.bind(uploadTokenController));
-router.post('/token/upload', tokenUploadLimiter, requireUploadToken, upload.array('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
+router.post('/token/upload', tokenUploadLimiter, requireUploadToken, handleUpload('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
 router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
 
 // Guest upload routes (requires PIN auth with upload access)
 router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));
-router.post('/guest/upload', requireUploadAuth, upload.array('images'), guestUploadController.uploadImages.bind(guestUploadController));
+router.post('/guest/upload', requireUploadAuth, handleUpload('images'), guestUploadController.uploadImages.bind(guestUploadController));
 router.delete('/guest/images', requireUploadAuth, guestUploadController.deleteImage.bind(guestUploadController));
 router.delete('/guest/images/batch', requireUploadAuth, guestUploadController.batchDeleteImages.bind(guestUploadController));
 

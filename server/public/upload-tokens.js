@@ -120,10 +120,18 @@ class UploadTokensManager {
             
             if (response.ok && data.folders) {
                 this.updateCsrfToken(data);
-                this.folders = data.folders.map(folder => ({
-                    name: folder.name,
-                    path: folder.path || folder.name
-                }));
+                this.folders = data.folders.map(folder => {
+                    const rawPath = folder.path || folder.name;
+                    // Normalize: folder API returns paths relative to uploadsDir (e.g. 'family')
+                    // but tokens need paths relative to server root (e.g. 'uploads/family')
+                    const normalizedPath = rawPath.startsWith('uploads/') || rawPath === 'uploads'
+                        ? rawPath
+                        : `uploads/${rawPath}`;
+                    return {
+                        name: folder.name,
+                        path: normalizedPath
+                    };
+                });
                 this.populateFolderSelect();
             }
         } catch (error) {
