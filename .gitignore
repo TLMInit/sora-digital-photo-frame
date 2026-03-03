@@ -179,6 +179,8 @@ CLAUDE.md
 commands
 server/data/access-accounts.json
 server/data/upload-metadata.json
+server/data/upload-tokens.json
+server/data/devices.json
 server/data/sessions/
 server/uploads/family/test*.jpg
 server/uploads/vacation/test*.jpg

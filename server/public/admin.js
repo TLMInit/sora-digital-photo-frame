@@ -261,6 +261,7 @@ class PhotoFrameAdmin {
 
         // Selection controls
         document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.showBulkDeleteModal());
+        document.getElementById('selectAllBtn').addEventListener('click', () => this.toggleSelectAll());
         
         // Bulk delete modal
         document.getElementById('cancelBulkDeleteBtn').addEventListener('click', () => this.hideBulkDeleteModal());
@@ -272,19 +273,40 @@ class PhotoFrameAdmin {
             }
         });
 
-        // Google Photos modal
+        // Google Photos modal (dialog-based)
         document.getElementById('cancelGooglePhotosBtn').addEventListener('click', () => {
             if (window.googlePhotosSync) {
                 window.googlePhotosSync.hideGooglePhotosModal();
             }
         });
-
+        document.getElementById('closeGooglePhotosModal').addEventListener('click', () => {
+            if (window.googlePhotosSync) {
+                window.googlePhotosSync.hideGooglePhotosModal();
+            }
+        });
         document.getElementById('googlePhotosModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 if (window.googlePhotosSync) {
                     window.googlePhotosSync.hideGooglePhotosModal();
                 }
             }
+        });
+
+        // Move to folder
+        document.getElementById('moveToFolderBtn').addEventListener('click', () => this.showMoveToFolderModal());
+        document.getElementById('cancelMoveBtn').addEventListener('click', () => this.hideMoveToFolderModal());
+        document.getElementById('closeMoveToFolderModal').addEventListener('click', () => this.hideMoveToFolderModal());
+        document.getElementById('confirmMoveBtn').addEventListener('click', () => this.confirmMoveToFolder());
+        document.getElementById('moveToFolderModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) this.hideMoveToFolderModal();
+        });
+
+        // Upload destination prompt
+        document.getElementById('cancelUploadDestBtn').addEventListener('click', () => this.hideUploadDestinationModal());
+        document.getElementById('closeUploadDestModal').addEventListener('click', () => this.hideUploadDestinationModal());
+        document.getElementById('confirmUploadDestBtn').addEventListener('click', () => this.confirmUploadDestination());
+        document.getElementById('uploadDestinationModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) this.hideUploadDestinationModal();
         });
 
         // Empty state upload functionality
@@ -481,7 +503,7 @@ class PhotoFrameAdmin {
         div.dataset.type = 'image';
         div.innerHTML = `
             <div class="admin-photo-image">
-                <img src="${file.url}" alt="${file.name}" loading="lazy">
+                <img src="${file.thumbnailUrl || file.url}" alt="${file.name}" loading="lazy">
             </div>
             <div class="photo-grid-overlay">
                 <div class="photo-grid-overlay-top">
@@ -566,9 +588,138 @@ class PhotoFrameAdmin {
 
     openGooglePhotosImport() {
         if (window.googlePhotosSync) {
+            this.populateFolderSelect('googlePhotosDestinationSelect', this.currentPath);
             window.googlePhotosSync.openGooglePhotosModal(this.currentPath);
         } else {
             this.showToast('Google Photos integration not available', 'error');
+        }
+    }
+
+    // Populate a <select> element with folder options from the folder list API
+    async populateFolderSelect(selectId, defaultValue) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        try {
+            const response = await this.authenticatedFetch('/api/admin/folders?path=uploads');
+            if (!response) return;
+            const data = await response.json();
+
+            select.innerHTML = '<option value="uploads">Home (uploads)</option>';
+            if (data.folders) {
+                data.folders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.name;
+                    select.appendChild(option);
+                });
+            }
+
+            if (defaultValue) {
+                select.value = defaultValue;
+            }
+        } catch (error) {
+            console.error('Error populating folder select:', error);
+        }
+    }
+
+    // Move to folder modal
+    showMoveToFolderModal() {
+        if (this.selectedItems.size === 0) return;
+        this.populateFolderSelect('moveDestinationSelect', this.currentPath);
+        document.getElementById('moveCount').textContent = this.selectedItems.size;
+        document.getElementById('moveToFolderModal').showModal();
+    }
+
+    hideMoveToFolderModal() {
+        document.getElementById('moveToFolderModal').close();
+    }
+
+    async confirmMoveToFolder() {
+        const destinationPath = document.getElementById('moveDestinationSelect').value;
+        const selectedPaths = Array.from(this.selectedItems);
+
+        if (selectedPaths.length === 0) {
+            this.hideMoveToFolderModal();
+            return;
+        }
+
+        try {
+            this.showToast('Moving photos...', 'info');
+
+            const response = await this.authenticatedFetch('/api/admin/images/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: selectedPaths, destinationPath: destinationPath })
+            });
+
+            if (!response) return;
+            const data = await response.json();
+
+            if (response.ok || response.status === 207) {
+                this.showToast(`Successfully moved ${data.movedCount} photo(s)`, 'success');
+                this.clearSelection();
+                this.loadFolderContents();
+            } else {
+                this.showToast(data.message || 'Failed to move photos', 'error');
+            }
+        } catch (error) {
+            console.error('Error moving photos:', error);
+            this.showToast('Failed to move photos', 'error');
+        } finally {
+            this.hideMoveToFolderModal();
+        }
+    }
+
+    // Upload destination prompt
+    showUploadDestinationModal(files) {
+        this._pendingUploadFiles = files;
+        this.populateFolderSelect('uploadDestinationSelect', this.currentPath);
+        document.getElementById('uploadDestinationModal').showModal();
+    }
+
+    hideUploadDestinationModal() {
+        document.getElementById('uploadDestinationModal').close();
+        this._pendingUploadFiles = null;
+    }
+
+    confirmUploadDestination() {
+        const destinationPath = document.getElementById('uploadDestinationSelect').value;
+        const files = this._pendingUploadFiles;
+        this.hideUploadDestinationModal();
+
+        if (!files || files.length === 0) return;
+
+        this.uploadFilesToPath(files, destinationPath);
+    }
+
+    async uploadFilesToPath(files, targetPath) {
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('images', file);
+        });
+        formData.append('path', targetPath);
+
+        this.showToast(`Uploading ${files.length} file(s)...`, 'info');
+
+        try {
+            const response = await this.authenticatedFetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response) return;
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
+                this.loadFolderContents();
+            } else {
+                this.showToast(data.message || 'Upload failed', 'error');
+            }
+        } catch (error) {
+            console.error('Error uploading files:', error);
+            this.showToast('Upload failed', 'error');
         }
     }
 
@@ -743,39 +894,10 @@ class PhotoFrameAdmin {
     async uploadFiles() {
         if (this.selectedFiles.length === 0) return;
         
-        const formData = new FormData();
-        this.selectedFiles.forEach(file => {
-            formData.append('images', file);
-        });
-        formData.append('path', this.currentPath);
-        
-        this.showUploadProgress();
-        
-        try {
-            const response = await this.authenticatedFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            if (!response) {
-                this.hideUploadProgress();
-                return; // Session expired
-            }
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
-                this.hideUploadModal();
-                this.loadFolderContents();
-            } else {
-                this.showToast(data.message || 'Upload failed', 'error');
-            }
-        } catch (error) {
-            console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
-        }
-        
-        this.hideUploadProgress();
+        // Close upload modal first, then show destination prompt
+        const files = [...this.selectedFiles];
+        this.hideUploadModal();
+        this.showUploadDestinationModal(files);
     }
 
     showUploadProgress() {
@@ -802,33 +924,7 @@ class PhotoFrameAdmin {
 
     async uploadFilesDirectly(files) {
         if (files.length === 0) return;
-        
-        const formData = new FormData();
-        files.forEach(file => {
-            formData.append('images', file);
-        });
-        formData.append('path', this.currentPath);
-        
-        this.showToast(`Uploading ${files.length} file(s) to ${this.currentPath}...`, 'info');
-        
-        try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully to ${this.currentPath}`, 'success');
-                this.loadFolderContents();
-            } else {
-                this.showToast(data.message || 'Upload failed', 'error');
-            }
-        } catch (error) {
-            console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
-        }
+        this.showUploadDestinationModal(Array.from(files));
     }
 
     showContextMenu(event, item) {
@@ -1270,6 +1366,33 @@ class PhotoFrameAdmin {
         this.updateSelectionUI();
     }
 
+    toggleSelectAll() {
+        const allSelected = this.availableImages.length > 0 && this.selectedItems.size === this.availableImages.length;
+        if (allSelected) {
+            this.clearSelection();
+        } else {
+            this.selectAllPhotos();
+        }
+    }
+
+    selectAllPhotos() {
+        this.availableImages.forEach(file => {
+            const filePath = file.path;
+            if (!this.selectedItems.has(filePath)) {
+                this.selectedItems.add(filePath);
+                const fileElement = document.querySelector(`[data-path="${filePath}"]`);
+                if (fileElement) {
+                    fileElement.classList.add('selected');
+                    const checkbox = fileElement.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        });
+        this.updateSelectionUI();
+    }
+
     updateSelectionUI() {
         const selectionCount = this.selectedItems.size;
         const fabBadge = document.getElementById('fabBadge');
@@ -1297,6 +1420,16 @@ class PhotoFrameAdmin {
             selectionFab.classList.remove('hidden');
         } else {
             selectionFab.classList.add('hidden');
+        }
+
+        // Update Select All button icon and tooltip
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const selectAllIcon = document.getElementById('selectAllIcon');
+        if (selectAllBtn && selectAllIcon) {
+            const allSelected = this.availableImages.length > 0 && selectionCount === this.availableImages.length;
+            selectAllIcon.textContent = allSelected ? 'deselect' : 'select_all';
+            selectAllBtn.setAttribute('data-tooltip', allSelected ? 'Deselect All' : 'Select All');
+            selectAllBtn.setAttribute('aria-label', allSelected ? 'Deselect All' : 'Select All');
         }
     }
 
@@ -1488,39 +1621,9 @@ class PhotoFrameAdmin {
     async uploadEmptyStateFiles() {
         if (!this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0) return;
         
-        const formData = new FormData();
-        this.emptyStateSelectedFiles.forEach(file => {
-            formData.append('images', file);
-        });
-        formData.append('path', this.currentPath);
-        
-        this.showEmptyStateUploadProgress();
-        
-        try {
-            const response = await this.authenticatedFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            if (!response) {
-                this.hideEmptyStateUploadProgress();
-                return; // Session expired
-            }
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
-                this.resetEmptyStateUpload();
-                this.loadFolderContents(); // This will hide the empty state and show the uploaded files
-            } else {
-                this.showToast(data.message || 'Upload failed', 'error');
-            }
-        } catch (error) {
-            console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
-        }
-        
-        this.hideEmptyStateUploadProgress();
+        const files = [...this.emptyStateSelectedFiles];
+        this.resetEmptyStateUpload();
+        this.showUploadDestinationModal(files);
     }
 
     showEmptyStateUploadProgress() {

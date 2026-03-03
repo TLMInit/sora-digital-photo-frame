@@ -17,6 +17,15 @@ class GooglePhotosSync {
     this.setupMessageListener();
   }
 
+  // CSRF-aware fetch wrapper for state-changing requests
+  csrfFetch(url, options = {}) {
+    options.credentials = 'include';
+    if (window.csrfManager) {
+      options = window.csrfManager.addToRequest(options);
+    }
+    return fetch(url, options);
+  }
+
   bindEvents() {
     console.log('🔧 [DEBUG] bindEvents() called');
     const googlePhotosBtn = document.getElementById('googlePhotosBtn');
@@ -136,7 +145,7 @@ class GooglePhotosSync {
       const redirectUri = window.location.origin + '/api/admin/google-photos/callback';
       console.log('🔧 [DEBUG] Making auth request with redirectUri:', redirectUri);
 
-      const response = await fetch('/api/admin/google-photos/auth', {
+      const response = await this.csrfFetch('/api/admin/google-photos/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -251,7 +260,7 @@ class GooglePhotosSync {
 
   async logout() {
     try {
-      const response = await fetch('/api/admin/google-photos/auth', {
+      const response = await this.csrfFetch('/api/admin/google-photos/auth', {
         method: 'DELETE'
       });
 
@@ -298,6 +307,11 @@ class GooglePhotosSync {
     }
 
     this.currentImportPath = currentPath;
+    // Set destination dropdown to current path if available
+    const destSelect = document.getElementById('googlePhotosDestinationSelect');
+    if (destSelect) {
+      destSelect.value = currentPath;
+    }
     this.showGooglePhotosModal();
     this.createPickerSession();
   }
@@ -305,17 +319,9 @@ class GooglePhotosSync {
   showGooglePhotosModal() {
     const modal = document.getElementById('googlePhotosModal');
     if (modal) {
-      modal.classList.remove('hidden');
       this.resetModalStates();
       document.getElementById('sessionLoadingState').classList.remove('hidden');
-    }
-  }
-
-  hideGooglePhotosModal() {
-    const modal = document.getElementById('googlePhotosModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      this.currentSessionUrl = null;
+      modal.showModal();
     }
   }
 
@@ -345,17 +351,23 @@ class GooglePhotosSync {
     });
   }
 
+  getSelectedDestination() {
+    const destSelect = document.getElementById('googlePhotosDestinationSelect');
+    return (destSelect && destSelect.value) ? destSelect.value : this.currentImportPath;
+  }
+
   async createPickerSession() {
     try {
       console.log('🔧 [DEBUG] Creating Google Photos picker session...');
 
-      const response = await fetch('/api/admin/google-photos/picker-session', {
+      const destinationPath = this.getSelectedDestination();
+      const response = await this.csrfFetch('/api/admin/google-photos/picker-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          destinationPath: this.currentImportPath
+          destinationPath: destinationPath
         })
       });
 
@@ -677,7 +689,7 @@ class GooglePhotosSync {
       <div class="import-actions">
         <button id="importToFolderBtn" class="btn-primary">
           <span class="material-icons">folder</span>
-          Import to ${this.currentImportPath.split('/').pop()}
+          Import to ${this.getSelectedDestination().split('/').pop()}
         </button>
       </div>
     `;
@@ -747,20 +759,21 @@ class GooglePhotosSync {
       return;
     }
 
-    console.log('🔧 [DEBUG] Starting background import of', this.selectedMediaItems.length, 'photos to', this.currentImportPath);
+    const destinationPath = this.getSelectedDestination();
+    console.log('🔧 [DEBUG] Starting background import of', this.selectedMediaItems.length, 'photos to', destinationPath);
 
     try {
       // Show importing state briefly
       this.showImportingState();
 
-      const response = await fetch('/api/admin/google-photos/import', {
+      const response = await this.csrfFetch('/api/admin/google-photos/import', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           mediaItems: this.selectedMediaItems,
-          destinationPath: this.currentImportPath
+          destinationPath: destinationPath
         })
       });
 
@@ -894,7 +907,7 @@ class GooglePhotosSync {
 
     const modal = document.getElementById('googlePhotosModal');
     if (modal) {
-      modal.classList.add('hidden');
+      modal.close();
       this.currentSessionUrl = null;
       this.currentSessionData = null;
       this.selectedMediaItems = null;

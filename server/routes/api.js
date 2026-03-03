@@ -6,7 +6,9 @@ const accessAccountController = require('../controllers/accessAccountController'
 const googlePhotosController = require('../controllers/googlePhotosController');
 const guestUploadController = require('../controllers/guestUploadController');
 const uploadTokenController = require('../controllers/uploadTokenController');
+const frameController = require('../controllers/frameController');
 const upload = require('../middleware/upload');
+const { handleUpload } = require('../middleware/upload');
 const { requireAuth, requireUploadAuth, requireUploadToken } = require('../middleware/auth');
 const { 
   tokenValidationLimiter, 
@@ -31,11 +33,33 @@ router.get('/folders', folderController.getFolderStructure.bind(folderController
 router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
 router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbnail.bind(folderController));
 
+// Frame display routes (render requires session auth, device config requires admin auth)
+router.get('/frame/render', frameController.renderImage.bind(frameController));
+router.get('/frame/devices', requireAuth, frameController.listDevices.bind(frameController));
+router.get('/frame/device/:deviceId', requireAuth, frameController.getDevice.bind(frameController));
+router.put('/frame/device/:deviceId', requireAuth, frameController.saveDevice.bind(frameController));
+router.delete('/frame/device/:deviceId', requireAuth, frameController.deleteDevice.bind(frameController));
+router.get('/frame/cache/stats', requireAuth, frameController.getCacheStats.bind(frameController));
+router.delete('/frame/cache', requireAuth, frameController.clearCache.bind(frameController));
+
 // Protected routes (authentication required)
 router.post('/upload', requireAuth, upload.array('images'), imageController.uploadImages.bind(imageController));
 router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
 router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));
+router.post('/admin/images/move', requireAuth, imageController.moveImages.bind(imageController));
+
+// Thumbnail backfill endpoint (admin only)
+const thumbnailManager = require('../utils/thumbnailManager');
+router.post('/admin/thumbnails/generate', requireAuth, async (req, res) => {
+  try {
+    const stats = await thumbnailManager.backfillThumbnails();
+    res.json({ message: 'Thumbnail generation complete', ...stats });
+  } catch (error) {
+    console.error('Error generating thumbnails:', error);
+    res.status(500).json({ message: 'Server error during thumbnail generation' });
+  }
+});
 
 // Folder management routes (protected)
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));
@@ -70,12 +94,13 @@ router.delete('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadT
 // With rate limiting to prevent abuse
 router.get('/upload-tokens/validate', tokenValidationLimiter, uploadTokenController.validateToken.bind(uploadTokenController));
 router.get('/upload-tokens/:id', requireAuth, tokenManagementLimiter, uploadTokenController.getToken.bind(uploadTokenController));
-router.post('/token/upload', tokenUploadLimiter, requireUploadToken, upload.array('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
+router.post('/token/upload', tokenUploadLimiter, requireUploadToken, handleUpload('images'), guestUploadController.uploadImagesWithToken.bind(guestUploadController));
 router.get('/token/folders', requireUploadToken, guestUploadController.getFolderContentsWithToken.bind(guestUploadController));
+router.get('/token/image', requireUploadToken, guestUploadController.serveTokenImage.bind(guestUploadController));
 
 // Guest upload routes (requires PIN auth with upload access)
 router.get('/guest/folders', requireUploadAuth, guestUploadController.getFolderContents.bind(guestUploadController));
-router.post('/guest/upload', requireUploadAuth, upload.array('images'), guestUploadController.uploadImages.bind(guestUploadController));
+router.post('/guest/upload', requireUploadAuth, handleUpload('images'), guestUploadController.uploadImages.bind(guestUploadController));
 router.delete('/guest/images', requireUploadAuth, guestUploadController.deleteImage.bind(guestUploadController));
 router.delete('/guest/images/batch', requireUploadAuth, guestUploadController.batchDeleteImages.bind(guestUploadController));
 

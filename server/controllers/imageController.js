@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const { isPathSafe } = require('../utils/pathValidator');
+const thumbnailManager = require('../utils/thumbnailManager');
 
 class ImageController {
   constructor() {
@@ -12,6 +13,11 @@ class ImageController {
     this.imageCache = null;
     this.cacheTimestamp = null;
     this.cacheExpiry = parseInt(process.env.IMAGE_CACHE_EXPIRY) || 60000; // Cache for 1 minute
+  }
+
+  // Extract uploads-relative path from an API path like "uploads/family/photo.jpg" → "family/photo.jpg"
+  uploadsRelativePath(imagePath) {
+    return imagePath.startsWith('uploads/') ? imagePath.slice('uploads/'.length) : imagePath;
   }
 
   // Get all images recursively with caching
@@ -26,6 +32,7 @@ class ImageController {
     const items = await fs.readdir(dir, { withFileTypes: true });
     
     for (const item of items) {
+      if (item.name === '.thumbs' || item.name === '.render-cache') continue; // Skip cache directories
       const fullPath = path.join(dir, item.name);
       if (item.isDirectory()) {
         const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion
@@ -200,10 +207,21 @@ class ImageController {
         });
       }
       
-      // Generate thumbnail
+      // Try to serve pre-generated static thumbnail first
+      const thumbPath = thumbnailManager.getThumbPath(imageId);
+      if (await fs.pathExists(thumbPath)) {
+        res.set({
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable'
+        });
+        return res.sendFile(thumbPath);
+      }
+      
+      // Generate thumbnail on-the-fly as fallback
       const thumbnailBuffer = await sharp(imagePath)
-        .resize(200, 200, { fit: 'cover' })
-        .jpeg({ quality: 80 })
+        .resize(320, 320, { fit: 'inside', withoutEnlargement: true })
+        .rotate()
+        .jpeg({ quality: 75 })
         .toBuffer();
       
       res.set({
@@ -264,6 +282,10 @@ class ImageController {
         await fs.remove(file.path);
         await fs.move(processedPath, targetFilePath);
         
+        // Generate thumbnail for the uploaded image
+        const relativePath = path.relative(this.uploadsDir, targetFilePath);
+        await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
+        
         processedFiles.push({
           filename: file.filename,
           originalname: file.originalname,
@@ -299,6 +321,9 @@ class ImageController {
       }
       
       await fs.remove(fullPath);
+      
+      // Delete associated thumbnail
+      await thumbnailManager.deleteThumbnail(this.uploadsRelativePath(imagePath));
       
       // Clear cache after deletion to update available images
       this.clearImageCache();
@@ -336,6 +361,8 @@ class ImageController {
           
           if (await fs.pathExists(fullPath)) {
             await fs.remove(fullPath);
+            // Delete associated thumbnail
+            await thumbnailManager.deleteThumbnail(this.uploadsRelativePath(imagePath));
             results.deletedCount++;
           } else {
             results.failedCount++;
@@ -399,6 +426,11 @@ class ImageController {
       await fs.remove(fullPath);
       await fs.move(tempPath, fullPath);
       
+      // Regenerate thumbnail for rotated image
+      const relativePath = path.relative(this.uploadsDir, fullPath);
+      await thumbnailManager.deleteThumbnail(relativePath);
+      await thumbnailManager.generateThumbnail(relativePath, fullPath);
+      
       // Clear cache after rotation to update available images
       this.clearImageCache();
       
@@ -407,6 +439,95 @@ class ImageController {
     } catch (error) {
       console.error('Error rotating image:', error);
       res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // Move images to a different folder
+  async moveImages(req, res) {
+    try {
+      const { paths, destinationPath } = req.body;
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return res.status(400).json({ message: 'Invalid paths provided' });
+      }
+
+      if (!destinationPath || !isPathSafe(destinationPath)) {
+        return res.status(400).json({ message: 'Invalid destination path' });
+      }
+
+      const destDir = path.join(__dirname, '..', destinationPath);
+      if (!await fs.pathExists(destDir)) {
+        return res.status(400).json({ message: 'Destination folder does not exist' });
+      }
+
+      const destStat = await fs.stat(destDir);
+      if (!destStat.isDirectory()) {
+        return res.status(400).json({ message: 'Destination is not a folder' });
+      }
+
+      const results = { movedCount: 0, failedCount: 0, errors: [] };
+
+      for (const imagePath of paths) {
+        try {
+          if (!isPathSafe(imagePath)) {
+            results.failedCount++;
+            results.errors.push(`Invalid path: ${imagePath}`);
+            continue;
+          }
+
+          const fullPath = path.join(__dirname, '..', imagePath);
+          if (!await fs.pathExists(fullPath)) {
+            results.failedCount++;
+            results.errors.push(`File not found: ${imagePath}`);
+            continue;
+          }
+
+          const fileStat = await fs.stat(fullPath);
+          if (!fileStat.isFile()) {
+            results.failedCount++;
+            results.errors.push(`Not a file: ${imagePath}`);
+            continue;
+          }
+
+          const filename = path.basename(imagePath);
+          const targetPath = path.join(destDir, filename);
+
+          if (await fs.pathExists(targetPath)) {
+            results.failedCount++;
+            results.errors.push(`File already exists in destination: ${filename}`);
+            continue;
+          }
+
+          await fs.move(fullPath, targetPath, { overwrite: false });
+          // Move associated thumbnail
+          const oldRelative = path.relative(this.uploadsDir, fullPath);
+          const newRelative = path.relative(this.uploadsDir, targetPath);
+          await thumbnailManager.moveThumbnail(oldRelative, newRelative);
+          results.movedCount++;
+        } catch (error) {
+          console.error(`Error moving ${imagePath}:`, error);
+          results.failedCount++;
+          results.errors.push(`Failed to move: ${imagePath}`);
+        }
+      }
+
+      // Clear cache after moving
+      this.clearImageCache();
+
+      if (results.failedCount > 0) {
+        res.status(207).json({
+          message: `Moved ${results.movedCount} images, failed to move ${results.failedCount}`,
+          ...results
+        });
+      } else {
+        res.json({
+          message: `Successfully moved ${results.movedCount} images`,
+          ...results
+        });
+      }
+    } catch (error) {
+      console.error('Error moving images:', error);
+      res.status(500).json({ message: 'Server error during move' });
     }
   }
 }

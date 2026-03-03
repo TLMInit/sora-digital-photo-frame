@@ -301,7 +301,7 @@ class GuestUploadManager {
             div.dataset.type = 'image';
             div.innerHTML = `
                 <div class="admin-photo-image">
-                    <img src="${file.url}" alt="${file.name}" loading="lazy">
+                    <img src="${file.thumbnail || file.url}" alt="${file.name}" loading="lazy" onerror="this.onerror=null;this.src='${file.url}';">
                 </div>
                 <div class="photo-grid-overlay">
                     <div class="photo-grid-overlay-top">
@@ -548,11 +548,42 @@ class GuestUploadManager {
                 this.hideUploadModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.error || data.message || 'Upload failed', 'error');
+                // Show detailed error message
+                let errorMsg = data.message || data.error || 'Upload failed';
+
+                // Show per-file error details if available
+                if (data.files && Array.isArray(data.files)) {
+                    const failedFiles = data.files.filter(f => !f.success);
+                    if (failedFiles.length > 0) {
+                        const details = failedFiles.map(f =>
+                            `${f.originalname || f.filename}: ${f.errorMessage || 'Unknown error'}`
+                        ).join('\n');
+                        errorMsg += '\n\nFailed files:\n' + details;
+                    }
+                }
+
+                // Show error code guidance for common issues
+                if (data.code === 'UPLOAD_TOO_LARGE') {
+                    errorMsg += '\n\nTip: Try reducing the file size or resolution before uploading.';
+                } else if (data.code === 'INVALID_FILE_TYPE') {
+                    errorMsg += '\n\nTip: Only JPEG, PNG, GIF, and WebP images are allowed.';
+                } else if (data.code === 'INVALID_TARGET_FOLDER') {
+                    errorMsg += '\n\nThe upload destination folder is invalid. Please contact the link owner.';
+                }
+
+                this.showToast(errorMsg, 'error');
+
+                // If some files succeeded (207), still refresh
+                if (data.successCount && data.successCount > 0) {
+                    if (this.tokenInfo.uploadLimit) {
+                        document.getElementById('uploadCount').textContent = data.uploadCount || 0;
+                    }
+                    this.loadFolderContents();
+                }
             }
         } catch (error) {
             console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
+            this.showToast('Upload failed. Please check your connection and try again.', 'error');
         }
 
         this.hideUploadProgress();

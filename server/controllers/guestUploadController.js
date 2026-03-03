@@ -3,7 +3,8 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 const uploadMetadataController = require('./uploadMetadataController');
 const imageController = require('./imageController');
-const { isPathSafe } = require('../utils/pathValidator');
+const { isPathSafe, normalizeTargetFolder } = require('../utils/pathValidator');
+const thumbnailManager = require('../utils/thumbnailManager');
 
 class GuestUploadController {
     constructor() {
@@ -11,20 +12,48 @@ class GuestUploadController {
         this.serverRoot = path.join(__dirname, '..');
     }
 
+    /**
+     * Categorize a file processing error into a code and user-facing message.
+     */
+    categorizeFileError(error) {
+        // Sharp-specific errors
+        if (error.message && (error.message.includes('Input file') || error.message.includes('Input buffer') || error.message.includes('unsupported image format'))) {
+            return {
+                errorCode: 'IMAGE_PROCESSING_FAILED',
+                errorMessage: 'Image could not be processed. The file may be corrupted or not a valid image.'
+            };
+        }
+        return {
+            errorCode: 'FILE_IO_ERROR',
+            errorMessage: 'Failed to save file to destination folder.'
+        };
+    }
+
     // Get folder contents for token-based uploads - shows target folder only
     async getFolderContentsWithToken(req, res) {
         try {
             const token = req.uploadToken;
-            const folderPath = token.targetFolder || 'uploads';
+            const rawFolder = token.targetFolder || 'uploads';
 
-            if (!isPathSafe(folderPath)) {
-                return res.status(400).json({ message: 'Invalid path' });
+            const { valid, normalized: folderPath, error: normError } = normalizeTargetFolder(rawFolder);
+            if (!valid) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'INVALID_TARGET_FOLDER',
+                    message: normError || 'Invalid target folder',
+                    targetFolder: rawFolder
+                });
             }
 
             const fullPath = path.join(this.serverRoot, folderPath);
 
             if (!await fs.pathExists(fullPath)) {
-                return res.status(404).json({ message: 'Folder not found' });
+                return res.status(404).json({
+                    success: false,
+                    code: 'TARGET_FOLDER_NOT_FOUND',
+                    message: 'Target folder not found',
+                    targetFolder: folderPath
+                });
             }
 
             const items = await fs.readdir(fullPath, { withFileTypes: true });
@@ -50,11 +79,13 @@ class GuestUploadController {
                             this.uploadsDir,
                             path.join(this.serverRoot, filePath)
                         );
+                        const tokenParam = encodeURIComponent(req.query.token || '');
                         files.push({
                             name: item.name,
                             type: 'image',
                             path: filePath,
-                            url: `/uploads/${relativePath}`,
+                            url: `/api/token/image?token=${tokenParam}&path=${encodeURIComponent(relativePath)}`,
+                            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail`,
                             ownedByUser: true
                         });
                     }
@@ -68,7 +99,11 @@ class GuestUploadController {
             });
         } catch (error) {
             console.error('Error reading folder for token upload:', error);
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({
+                success: false,
+                code: 'SERVER_ERROR',
+                message: 'Failed to read folder contents'
+            });
         }
     }
 
@@ -78,14 +113,22 @@ class GuestUploadController {
             const folderPath = req.query.path || 'uploads';
 
             if (!isPathSafe(folderPath)) {
-                return res.status(400).json({ message: 'Invalid path' });
+                return res.status(400).json({
+                    success: false,
+                    code: 'INVALID_TARGET_FOLDER',
+                    message: 'Invalid path'
+                });
             }
 
             const fullPath = path.join(this.serverRoot, folderPath);
             const accountId = req.session.accessAccount.id;
 
             if (!await fs.pathExists(fullPath)) {
-                return res.status(404).json({ message: 'Folder not found' });
+                return res.status(404).json({
+                    success: false,
+                    code: 'TARGET_FOLDER_NOT_FOUND',
+                    message: 'Folder not found'
+                });
             }
 
             const items = await fs.readdir(fullPath, { withFileTypes: true });
@@ -116,6 +159,7 @@ class GuestUploadController {
                             type: 'image',
                             path: filePath,
                             url: `/uploads/${relativePath}`,
+                            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail`,
                             ownedByUser: true
                         });
                     }
@@ -129,7 +173,11 @@ class GuestUploadController {
             });
         } catch (error) {
             console.error('Error reading folder for guest:', error);
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({
+                success: false,
+                code: 'SERVER_ERROR',
+                message: 'Failed to read folder contents'
+            });
         }
     }
 
@@ -140,67 +188,110 @@ class GuestUploadController {
             const token = req.uploadToken;
             const uploadTokenController = require('./uploadTokenController');
             
-            const targetPath = token.targetFolder || 'uploads';
-            const processedFiles = [];
-            const uploadedPaths = [];
+            const rawTargetPath = token.targetFolder || 'uploads';
+            const { valid, normalized: targetPath, error: normError } = normalizeTargetFolder(rawTargetPath);
 
-            if (!isPathSafe(targetPath)) {
-                return res.status(400).json({ message: 'Invalid path' });
-            }
-
-            for (const file of uploadedFiles) {
-                const targetDir = path.join(this.serverRoot, targetPath);
-                const targetFilePath = path.join(targetDir, file.filename);
-
-                await fs.ensureDir(targetDir);
-
-                const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
-
-                await sharp(file.path)
-                    .rotate()
-                    .resize(
-                        parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
-                        parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
-                        { fit: 'inside', withoutEnlargement: true }
-                    )
-                    .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-                    .toFile(processedPath);
-
-                await fs.remove(file.path);
-                await fs.move(processedPath, targetFilePath);
-
-                const relativeFilePath = path.join(targetPath, file.filename);
-                uploadedPaths.push(relativeFilePath);
-
-                processedFiles.push({
-                    filename: file.filename,
-                    originalname: file.originalname,
-                    path: targetFilePath,
-                    size: file.size
+            if (!valid) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'INVALID_TARGET_FOLDER',
+                    message: normError || 'Invalid target folder path',
+                    tokenId: token.id,
+                    targetFolder: rawTargetPath
                 });
             }
 
-            // Record upload metadata with token ID
-            await uploadMetadataController.recordTokenUploads(token.id, token.name, uploadedPaths);
+            if (!uploadedFiles || uploadedFiles.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'NO_FILES',
+                    message: 'No files were uploaded'
+                });
+            }
 
-            // Increment the upload count for this token
-            await uploadTokenController.incrementUploadCount(token.id);
+            const processedFiles = [];
+            const failedFiles = [];
+            const uploadedPaths = [];
 
-            // Clear image cache
-            imageController.clearImageCache();
+            for (const file of uploadedFiles) {
+                try {
+                    const targetDir = path.join(this.serverRoot, targetPath);
+                    const targetFilePath = path.join(targetDir, file.filename);
 
-            res.json({
-                success: true,
-                message: 'Images uploaded successfully',
-                files: processedFiles,
-                uploadCount: token.uploadCount + uploadedFiles.length,
+                    await fs.ensureDir(targetDir);
+
+                    const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
+
+                    await sharp(file.path)
+                        .rotate()
+                        .resize(
+                            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
+                            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
+                            { fit: 'inside', withoutEnlargement: true }
+                        )
+                        .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+                        .toFile(processedPath);
+
+                    await fs.remove(file.path);
+                    await fs.move(processedPath, targetFilePath);
+
+                    // Generate thumbnail
+                    const relativePath = path.relative(this.uploadsDir, targetFilePath);
+                    await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
+
+                    const relativeFilePath = path.join(targetPath, file.filename);
+                    uploadedPaths.push(relativeFilePath);
+
+                    processedFiles.push({
+                        filename: file.filename,
+                        originalname: file.originalname,
+                        size: file.size,
+                        success: true
+                    });
+                } catch (fileError) {
+                    console.error(`Error processing file ${file.originalname}:`, fileError);
+                    // Clean up temp file on failure
+                    await fs.remove(file.path).catch(() => {});
+
+                    const { errorCode, errorMessage } = this.categorizeFileError(fileError);
+
+                    failedFiles.push({
+                        filename: file.filename,
+                        originalname: file.originalname,
+                        success: false,
+                        errorCode,
+                        errorMessage
+                    });
+                }
+            }
+
+            // Record upload metadata with token ID (only for successfully processed files)
+            if (uploadedPaths.length > 0) {
+                await uploadMetadataController.recordTokenUploads(token.id, token.name, uploadedPaths);
+                await uploadTokenController.incrementUploadCount(token.id);
+                imageController.clearImageCache();
+            }
+
+            const allSucceeded = failedFiles.length === 0;
+            const statusCode = failedFiles.length > 0 && processedFiles.length > 0 ? 207 : (failedFiles.length > 0 ? 400 : 200);
+
+            res.status(statusCode).json({
+                success: allSucceeded,
+                message: allSucceeded
+                    ? `${processedFiles.length} image(s) uploaded successfully`
+                    : `${processedFiles.length} succeeded, ${failedFiles.length} failed`,
+                files: [...processedFiles, ...failedFiles],
+                successCount: processedFiles.length,
+                failedCount: failedFiles.length,
+                uploadCount: token.uploadCount + processedFiles.length,
                 uploadLimit: token.uploadLimit
             });
         } catch (error) {
             console.error('Error uploading images with token:', error);
             res.status(500).json({ 
                 success: false,
-                message: 'Server error' 
+                code: 'SERVER_ERROR',
+                message: 'An unexpected error occurred during upload. Please try again.'
             });
         }
     }
@@ -209,61 +300,108 @@ class GuestUploadController {
     async uploadImages(req, res) {
         try {
             const uploadedFiles = req.files;
-            const targetPath = req.body.path || 'uploads';
+            const rawTargetPath = req.body.path || 'uploads';
             const accountId = req.session.accessAccount.id;
             const accountName = req.session.accessAccount.name;
-            const processedFiles = [];
-            const uploadedPaths = [];
 
-            if (!isPathSafe(targetPath)) {
-                return res.status(400).json({ message: 'Invalid path' });
-            }
+            const { valid, normalized: targetPath, error: normError } = normalizeTargetFolder(rawTargetPath);
 
-            for (const file of uploadedFiles) {
-                const targetDir = path.join(this.serverRoot, targetPath);
-                const targetFilePath = path.join(targetDir, file.filename);
-
-                await fs.ensureDir(targetDir);
-
-                const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
-
-                await sharp(file.path)
-                    .rotate()
-                    .resize(
-                        parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
-                        parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
-                        { fit: 'inside', withoutEnlargement: true }
-                    )
-                    .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-                    .toFile(processedPath);
-
-                await fs.remove(file.path);
-                await fs.move(processedPath, targetFilePath);
-
-                const relativeFilePath = path.join(targetPath, file.filename);
-                uploadedPaths.push(relativeFilePath);
-
-                processedFiles.push({
-                    filename: file.filename,
-                    originalname: file.originalname,
-                    path: targetFilePath,
-                    size: file.size
+            if (!valid) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'INVALID_TARGET_FOLDER',
+                    message: normError || 'Invalid target folder path'
                 });
             }
 
-            // Record upload metadata
-            await uploadMetadataController.recordUploads(accountId, accountName, uploadedPaths);
+            if (!uploadedFiles || uploadedFiles.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'NO_FILES',
+                    message: 'No files were uploaded'
+                });
+            }
 
-            // Clear image cache
-            imageController.clearImageCache();
+            const processedFiles = [];
+            const failedFiles = [];
+            const uploadedPaths = [];
 
-            res.json({
-                message: 'Images uploaded successfully',
-                files: processedFiles
+            for (const file of uploadedFiles) {
+                try {
+                    const targetDir = path.join(this.serverRoot, targetPath);
+                    const targetFilePath = path.join(targetDir, file.filename);
+
+                    await fs.ensureDir(targetDir);
+
+                    const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
+
+                    await sharp(file.path)
+                        .rotate()
+                        .resize(
+                            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
+                            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
+                            { fit: 'inside', withoutEnlargement: true }
+                        )
+                        .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+                        .toFile(processedPath);
+
+                    await fs.remove(file.path);
+                    await fs.move(processedPath, targetFilePath);
+
+                    // Generate thumbnail
+                    const relativePath = path.relative(this.uploadsDir, targetFilePath);
+                    await thumbnailManager.generateThumbnail(relativePath, targetFilePath);
+
+                    const relativeFilePath = path.join(targetPath, file.filename);
+                    uploadedPaths.push(relativeFilePath);
+
+                    processedFiles.push({
+                        filename: file.filename,
+                        originalname: file.originalname,
+                        size: file.size,
+                        success: true
+                    });
+                } catch (fileError) {
+                    console.error(`Error processing file ${file.originalname}:`, fileError);
+                    await fs.remove(file.path).catch(() => {});
+
+                    const { errorCode, errorMessage } = this.categorizeFileError(fileError);
+
+                    failedFiles.push({
+                        filename: file.filename,
+                        originalname: file.originalname,
+                        success: false,
+                        errorCode,
+                        errorMessage
+                    });
+                }
+            }
+
+            // Record upload metadata (only for successfully processed files)
+            if (uploadedPaths.length > 0) {
+                await uploadMetadataController.recordUploads(accountId, accountName, uploadedPaths);
+                imageController.clearImageCache();
+            }
+
+            const allSucceeded = failedFiles.length === 0;
+            const statusCode = failedFiles.length > 0 && processedFiles.length > 0 ? 207 : (failedFiles.length > 0 ? 400 : 200);
+
+            res.status(statusCode).json({
+                success: allSucceeded,
+                message: allSucceeded
+                    ? `${processedFiles.length} image(s) uploaded successfully`
+                    : `${processedFiles.length} succeeded, ${failedFiles.length} failed`,
+                files: [...processedFiles, ...failedFiles],
+                successCount: processedFiles.length,
+                failedCount: failedFiles.length
             });
         } catch (error) {
             console.error('Error uploading images (guest):', error);
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({
+                success: false,
+                code: 'SERVER_ERROR',
+                message: 'An unexpected error occurred during upload. Please try again.'
+            });
         }
     }
 
@@ -363,6 +501,38 @@ class GuestUploadController {
         } catch (error) {
             console.error('Error in batch delete (guest):', error);
             res.status(500).json({ message: 'Server error during batch deletion' });
+        }
+    }
+
+    // Serve an image file to token-authenticated users
+    async serveTokenImage(req, res) {
+        try {
+            const imagePath = req.query.path;
+            if (!imagePath) {
+                return res.status(400).json({ success: false, message: 'Image path is required' });
+            }
+
+            if (!isPathSafe(imagePath)) {
+                return res.status(400).json({ success: false, message: 'Invalid image path' });
+            }
+
+            const fullPath = path.join(this.uploadsDir, imagePath);
+
+            // Ensure resolved path is within uploads directory
+            const resolvedPath = path.resolve(fullPath);
+            const resolvedUploads = path.resolve(this.uploadsDir);
+            if (!resolvedPath.startsWith(resolvedUploads + path.sep) && resolvedPath !== resolvedUploads) {
+                return res.status(403).json({ success: false, message: 'Access denied' });
+            }
+
+            if (!await fs.pathExists(fullPath)) {
+                return res.status(404).json({ success: false, message: 'Image not found' });
+            }
+
+            res.sendFile(resolvedPath);
+        } catch (error) {
+            console.error('Error serving token image:', error);
+            res.status(500).json({ success: false, message: 'Server error' });
         }
     }
 }

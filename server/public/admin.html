@@ -983,6 +983,14 @@
 
             <!-- Floating Action Button -->
             <div id="selectionFab" class="selection-fab hidden">
+                <button id="selectAllBtn" class="fab-button" data-tooltip="Select All"
+                    aria-label="Select All" style="background: var(--muted); color: var(--muted-foreground); margin-right: 0.5rem;">
+                    <span class="material-symbols-outlined" id="selectAllIcon">select_all</span>
+                </button>
+                <button id="moveToFolderBtn" class="fab-button" data-tooltip="Move to Folder"
+                    aria-label="Move to Folder" style="background: var(--primary); margin-right: 0.5rem;">
+                    <span class="material-symbols-outlined">drive_file_move</span>
+                </button>
                 <button id="bulkDeleteBtn" class="fab-button" data-tooltip="Delete Selected Photos"
                     aria-label="Delete Selected Photos">
                     <span class="material-symbols-outlined">delete</span>
@@ -1145,39 +1153,56 @@
             </article>
         </dialog>
 
-        <div id="googlePhotosModal" class="modal hidden">
-            <div class="modal-content card card-elevated">
-                <h2 class="light-title">Import from Google Photos</h2>
-                <div class="google-photos-content">
-                    <div id="sessionLoadingState" class="session-state">
-                        <div class="session-loader">
-                            <div class="spinner"></div>
+        <dialog id="googlePhotosModal" class="dialog" aria-labelledby="google-photos-title">
+            <article>
+                <header>
+                    <h2 id="google-photos-title">Import from Google Photos</h2>
+                    <button id="closeGooglePhotosModal" class="btn-sm-icon-ghost absolute top-4 right-4"
+                        aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <div class="grid gap-4">
+                        <div class="grid gap-2">
+                            <label for="googlePhotosDestinationSelect" class="label">Import to folder</label>
+                            <select id="googlePhotosDestinationSelect" class="input">
+                                <option value="uploads">Home (uploads)</option>
+                            </select>
+                            <p class="text-sm text-muted-foreground">Photos will be imported into the selected folder.</p>
                         </div>
-                        <p>Creating Google Photos session...</p>
-                    </div>
-                    <div id="sessionReadyState" class="session-state hidden">
-                        <div class="session-icon">
-                            <span class="material-symbols-outlined">photo_library</span>
+                        <div class="google-photos-content">
+                            <div id="sessionLoadingState" class="session-state">
+                                <div class="session-loader">
+                                    <div class="spinner"></div>
+                                </div>
+                                <p>Creating Google Photos session...</p>
+                            </div>
+                            <div id="sessionReadyState" class="session-state hidden">
+                                <div class="session-icon">
+                                    <span class="material-symbols-outlined">photo_library</span>
+                                </div>
+                                <p>Google Photos session is ready!</p>
+                                <button id="openSessionBtn" class="btn btn-primary">
+                                    <span class="material-symbols-outlined">open_in_new</span>
+                                    Open Google Photos Picker
+                                </button>
+                            </div>
+                            <div id="sessionErrorState" class="session-state hidden">
+                                <div class="session-icon error">
+                                    <span class="material-symbols-outlined">error</span>
+                                </div>
+                                <p id="sessionErrorMessage">Failed to create session</p>
+                                <button id="retrySessionBtn" class="btn btn-secondary">Try Again</button>
+                            </div>
                         </div>
-                        <p>Google Photos session is ready!</p>
-                        <button id="openSessionBtn" class="btn btn-primary">
-                            <span class="material-symbols-outlined">open_in_new</span>
-                            Open Google Photos Picker
-                        </button>
                     </div>
-                    <div id="sessionErrorState" class="session-state hidden">
-                        <div class="session-icon error">
-                            <span class="material-symbols-outlined">error</span>
-                        </div>
-                        <p id="sessionErrorMessage">Failed to create session</p>
-                        <button id="retrySessionBtn" class="btn btn-secondary">Try Again</button>
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button id="cancelGooglePhotosBtn" class="btn btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
+                </section>
+                <footer>
+                    <button id="cancelGooglePhotosBtn" class="btn-outline">Cancel</button>
+                </footer>
+            </article>
+        </dialog>
 
         <!-- Bulk Delete Confirmation Modal -->
         <dialog id="bulkDeleteModal" class="dialog" aria-labelledby="bulk-delete-title"
@@ -1197,6 +1222,64 @@
                     <button id="confirmBulkDeleteBtn" class="btn-destructive">
                         <span class="material-symbols-outlined">delete</span>
                         Delete Photos
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Move to Folder Modal -->
+        <dialog id="moveToFolderModal" class="dialog" aria-labelledby="move-folder-title">
+            <article>
+                <header>
+                    <h2 id="move-folder-title">Move to Folder</h2>
+                    <button id="closeMoveToFolderModal" class="btn-sm-icon-ghost absolute top-4 right-4"
+                        aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <div class="grid gap-2">
+                        <label for="moveDestinationSelect" class="label">Destination folder</label>
+                        <select id="moveDestinationSelect" class="input">
+                            <option value="uploads">Home (uploads)</option>
+                        </select>
+                        <p class="text-sm text-muted-foreground">Move <span id="moveCount">0</span> selected photo(s) to the chosen folder.</p>
+                    </div>
+                </section>
+                <footer>
+                    <button id="cancelMoveBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmMoveBtn" class="btn">
+                        <span class="material-symbols-outlined">drive_file_move</span>
+                        Move Photos
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Upload Destination Modal -->
+        <dialog id="uploadDestinationModal" class="dialog" aria-labelledby="upload-dest-title">
+            <article>
+                <header>
+                    <h2 id="upload-dest-title">Upload to Folder</h2>
+                    <button id="closeUploadDestModal" class="btn-sm-icon-ghost absolute top-4 right-4"
+                        aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <div class="grid gap-2">
+                        <label for="uploadDestinationSelect" class="label">Destination folder</label>
+                        <select id="uploadDestinationSelect" class="input">
+                            <option value="uploads">Home (uploads)</option>
+                        </select>
+                        <p class="text-sm text-muted-foreground">Choose where to upload the selected files.</p>
+                    </div>
+                </section>
+                <footer>
+                    <button id="cancelUploadDestBtn" class="btn-outline">Cancel</button>
+                    <button id="confirmUploadDestBtn" class="btn">
+                        <span class="material-symbols-outlined">upload</span>
+                        Upload
                     </button>
                 </footer>
             </article>

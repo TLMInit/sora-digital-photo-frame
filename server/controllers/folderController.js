@@ -3,6 +3,7 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 const imageController = require('./imageController');
 const { isPathSafe } = require('../utils/pathValidator');
+const thumbnailManager = require('../utils/thumbnailManager');
 
 class FolderController {
   constructor() {
@@ -65,7 +66,7 @@ class FolderController {
       
       // If no images found, check subdirectories
       for (const item of items) {
-        if (item.isDirectory()) {
+        if (item.isDirectory() && item.name !== '.thumbs' && item.name !== '.render-cache') {
           const subImage = await this.findFirstImage(path.join(dir, item.name));
           if (subImage) {
             return subImage;
@@ -86,6 +87,7 @@ class FolderController {
       const items = await fs.readdir(dir, { withFileTypes: true });
       
       for (const item of items) {
+        if (item.name === '.thumbs' || item.name === '.render-cache') continue;
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
           count += await this.countImagesInFolder(fullPath);
@@ -129,7 +131,7 @@ class FolderController {
       
       // Process folders
       for (const item of items) {
-        if (item.isDirectory()) {
+        if (item.isDirectory() && item.name !== '.thumbs' && item.name !== '.render-cache') {
           const itemPath = path.join(fullPath, item.name);
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
           
@@ -297,6 +299,7 @@ class FolderController {
       const files = [];
       
       for (const item of items) {
+        if (item.name === '.thumbs' || item.name === '.render-cache') continue; // Skip cache directories
         if (item.isDirectory()) {
           folders.push({
             name: item.name,
@@ -304,11 +307,14 @@ class FolderController {
             path: path.join(folderPath, item.name)
           });
         } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+          const relativePath = path.relative(this.uploadsDir, path.join(fullPath, item.name));
+          const thumbnailUrl = await thumbnailManager.ensureThumbnail(relativePath);
           files.push({
             name: item.name,
             type: 'image',
             path: path.join(folderPath, item.name),
-            url: `/uploads/${path.relative(this.uploadsDir, path.join(fullPath, item.name))}`
+            url: `/uploads/${relativePath}`,
+            thumbnailUrl: thumbnailUrl || `/api/images/${encodeURIComponent(relativePath)}/thumbnail`
           });
         }
       }
